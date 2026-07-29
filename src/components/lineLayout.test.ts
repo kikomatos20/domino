@@ -1,0 +1,299 @@
+import { describe, expect, it } from "vitest";
+import { MIN_TABLE, TILE_LONG, TILE_SHORT, layoutLine, lineAxis } from "./lineLayout";
+import type { LaidTile } from "./lineLayout";
+import type { PlacedTile, Seat } from "@/engine/types";
+
+/** Build a connected line of `n` tiles opened by `openerSeat`. */
+function makeLine(n: number, openerSeat: Seat, openDouble: boolean): PlacedTile[] {
+  const line: PlacedTile[] = [
+    { left: 6, right: openDouble ? 6 : 5, seat: openerSeat, opening: true },
+  ];
+  let right = openDouble ? 6 : 5;
+  for (let i = 1; i < n; i++) {
+    const nextRight = (right + i) % 7;
+    line.push({ left: right, right: nextRight, seat: (i % 4) as Seat });
+    right = nextRight;
+  }
+  return line;
+}
+
+/** A realistic full round: all 28 tiles, 7 of them doubles. */
+function fullLine(openerSeat: Seat): PlacedTile[] {
+  const line: PlacedTile[] = [
+    { left: 6, right: 6, seat: openerSeat, opening: true },
+  ];
+  for (let i = 1; i < 28; i++) {
+    const dbl = i % 4 === 0; // 6 more doubles
+    line.push({ left: i % 7, right: dbl ? i % 7 : (i + 1) % 7, seat: (i % 4) as Seat });
+  }
+  return line;
+}
+
+function rectOf(it: { x: number; y: number; vertical: boolean }) {
+  return {
+    x: it.x,
+    y: it.y,
+    w: it.vertical ? TILE_SHORT : TILE_LONG,
+    h: it.vertical ? TILE_LONG : TILE_SHORT,
+  };
+}
+
+function overlaps(a: ReturnType<typeof rectOf>, b: ReturnType<typeof rectOf>) {
+  // Shrink by 1px so tiles that merely touch edge-to-edge don't count.
+  return (
+    a.x + 1 < b.x + b.w && b.x + 1 < a.x + a.w && a.y + 1 < b.y + b.h && b.y + 1 < a.y + a.h
+  );
+}
+
+const SEATS: Seat[] = [0, 1, 2, 3];
+const EPSILON = 0.01;
+
+/** How much of the previous tile's exit face the next tile covers. */
+function exitFaceContact(prev: LaidTile, next: LaidTile): number {
+  const a = rectOf(prev);
+  const b = rectOf(next);
+  if (prev.dir === "R" || prev.dir === "L") {
+    const face = prev.dir === "R" ? a.x + a.w : a.x;
+    const onFace =
+      prev.dir === "R"
+        ? Math.abs(b.x - face) < EPSILON
+        : Math.abs(b.x + b.w - face) < EPSILON;
+    return onFace ? Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) : 0;
+  }
+  const face = prev.dir === "D" ? a.y + a.h : a.y;
+  const onFace =
+    prev.dir === "D"
+      ? Math.abs(b.y - face) < EPSILON
+      : Math.abs(b.y + b.h - face) < EPSILON;
+  return onFace ? Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) : 0;
+}
+
+/** Longest edge the two tiles share, whichever sides happen to meet. */
+function sharedEdge(prev: LaidTile, next: LaidTile): number {
+  const a = rectOf(prev);
+  const b = rectOf(next);
+  const xAdj =
+    Math.abs(a.x + a.w - b.x) < EPSILON || Math.abs(b.x + b.w - a.x) < EPSILON;
+  const yAdj =
+    Math.abs(a.y + a.h - b.y) < EPSILON || Math.abs(b.y + b.h - a.y) < EPSILON;
+  const yOverlap = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+  const xOverlap = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+  return Math.max(xAdj ? yOverlap : 0, yAdj ? xOverlap : 0);
+}
+
+/**
+ * How well two consecutive tiles are joined.
+ *
+ * On a straight run they must meet face to face — the next tile covers the face
+ * the chain exits. At a corner the turning tile tucks alongside that end
+ * instead, making an L, so there any shared edge counts. Either way the contact
+ * must be a full tile-width: tiles that merely clip at a corner, or sit beside
+ * each other without a join, do not count as connected.
+ */
+function joinContact(prev: LaidTile, next: LaidTile): number {
+  return prev.dir === next.dir ? exitFaceContact(prev, next) : sharedEdge(prev, next);
+}
+
+/** Walk the chain in play order, pairing each tile with the one it joins. */
+function chainPairs(items: LaidTile[]): [LaidTile, LaidTile][] {
+  const open = items.find((i) => i.arm === "open")!;
+  const pairs: [LaidTile, LaidTile][] = [];
+  for (const arm of ["fwd", "bwd"] as const) {
+    const seq = items.filter((i) => i.arm === arm);
+    seq.forEach((tile, j) => {
+      const prev = j === 0 ? { ...open, dir: tile.dir } : seq[j - 1];
+      pairs.push([prev, tile]);
+    });
+  }
+  return pairs;
+}
+
+describe("lineAxis", () => {
+  it("runs the chain crosswise to an opening double", () => {
+    expect(lineAxis(makeLine(1, 0, true))).toBe("v"); // you open flat -> chain vertical
+    expect(lineAxis(makeLine(1, 2, true))).toBe("v");
+    expect(lineAxis(makeLine(1, 1, true))).toBe("h"); // East opens sideways
+    expect(lineAxis(makeLine(1, 3, true))).toBe("h");
+  });
+
+  it("runs the chain along an opening non-double", () => {
+    expect(lineAxis(makeLine(1, 0, false))).toBe("h");
+    expect(lineAxis(makeLine(1, 1, false))).toBe("v");
+  });
+});
+
+describe("layoutLine", () => {
+  it("places every tile exactly once", () => {
+    for (const seat of SEATS) {
+      for (const n of [1, 2, 7, 14, 28]) {
+        const items = layoutLine(makeLine(n, seat, true), 560);
+        expect(items.length).toBe(n);
+        expect(new Set(items.map((i) => i.idx)).size).toBe(n);
+      }
+    }
+  });
+
+  it("centers the opening tile on the table", () => {
+    for (const seat of SEATS) {
+      const size = 560;
+      const items = layoutLine(makeLine(12, seat, true), size);
+      const open = items.find((i) => i.p.opening)!;
+      const r = rectOf(open);
+      expect(r.x + r.w / 2).toBeCloseTo(size / 2, 5);
+      expect(r.y + r.h / 2).toBeCloseTo(size / 2, 5);
+    }
+  });
+
+  it("lays the opening tile flat toward whoever opened", () => {
+    expect(layoutLine(makeLine(3, 0, true), 560)[0].vertical).toBe(false); // you
+    expect(layoutLine(makeLine(3, 2, true), 560)[0].vertical).toBe(false); // partner
+    expect(layoutLine(makeLine(3, 1, true), 560)[0].vertical).toBe(true); // East
+    expect(layoutLine(makeLine(3, 3, true), 560)[0].vertical).toBe(true); // West
+  });
+
+  it("keeps every tile on the table, turning corners instead of shrinking", () => {
+    for (const seat of SEATS) {
+      for (const size of [360, 480, 560, 700]) {
+        for (const it of layoutLine(fullLine(seat), size)) {
+          const r = rectOf(it);
+          expect(r.x).toBeGreaterThanOrEqual(0);
+          expect(r.y).toBeGreaterThanOrEqual(0);
+          expect(r.x + r.w).toBeLessThanOrEqual(size);
+          expect(r.y + r.h).toBeLessThanOrEqual(size);
+        }
+      }
+    }
+  });
+
+  it("never overlaps two tiles on a full 28-tile round", () => {
+    for (const seat of SEATS) {
+      for (const size of [MIN_TABLE, 620, 700]) {
+        const rects = layoutLine(fullLine(seat), size).map(rectOf);
+        for (let i = 0; i < rects.length; i++) {
+          for (let j = i + 1; j < rects.length; j++) {
+            expect(overlaps(rects[i], rects[j])).toBe(false);
+          }
+        }
+      }
+    }
+  });
+
+  it("joins tiles face to face, never side by side or corner to corner", () => {
+    for (const seat of SEATS) {
+      for (const size of [MIN_TABLE, 620, 700]) {
+        for (const [prev, next] of chainPairs(layoutLine(fullLine(seat), size))) {
+          expect(
+            joinContact(prev, next),
+            `tile ${next.idx} does not meet the exit face of tile ${prev.idx} (size ${size}, seat ${seat})`
+          ).toBeGreaterThanOrEqual(TILE_SHORT - EPSILON);
+        }
+      }
+    }
+  });
+
+  it("actually turns corners on a long chain", () => {
+    const items = layoutLine(fullLine(0), 400);
+    // A chain that only ran straight would share one axis; corners break that.
+    const xs = new Set(items.map((i) => Math.round(i.x)));
+    const ys = new Set(items.map((i) => Math.round(i.y)));
+    expect(xs.size).toBeGreaterThan(1);
+    expect(ys.size).toBeGreaterThan(1);
+  });
+
+  it("stays tidy across hundreds of random chains", () => {
+    const EPS = 0.01;
+    const seeded = (seed: number) => {
+      let s = seed;
+      return () => {
+        s = (s * 1103515245 + 12345) % 2147483648;
+        return s / 2147483648;
+      };
+    };
+    // A random but legal chain: every tile matches the previous open end.
+    const randomLine = (n: number, seat: Seat, r: () => number): PlacedTile[] => {
+      const start = Math.floor(r() * 7);
+      const openDouble = r() < 0.35;
+      let right = openDouble ? start : (start + 1) % 7;
+      const line: PlacedTile[] = [
+        { left: start, right, seat, opening: true },
+      ];
+      for (let i = 1; i < n; i++) {
+        const next = r() < 0.25 ? right : Math.floor(r() * 7);
+        line.push({ left: right, right: next, seat: (i % 4) as Seat });
+        right = next;
+      }
+      return line;
+    };
+    // Sizes the app actually renders on a laptop or tablet. A full 28-tile
+    // chain is 1372px of dominoes; below ~480px square there is genuinely not
+    // enough room to coil it without the two arms meeting (see the test below).
+    for (let seed = 1; seed <= 120; seed++) {
+      for (const seat of SEATS) {
+        for (const size of [MIN_TABLE, 620, 700]) {
+          const line = randomLine(28, seat, seeded(seed * 131 + seat));
+          const items = layoutLine(line, size);
+          const rects = items.map(rectOf);
+          const where = `seed ${seed}/seat ${seat}/size ${size}`;
+
+          // Collect problems first, then assert once — 1400 layouts is far too
+          // many for a per-tile expect() call.
+          const problems: string[] = [];
+          for (let i = 0; i < rects.length; i++) {
+            const r = rects[i];
+            if (r.x < 0 || r.y < 0 || r.x + r.w > size || r.y + r.h > size) {
+              problems.push(`${where}: tile ${i} off the table`);
+            }
+            for (let j = i + 1; j < rects.length; j++) {
+              if (overlaps(r, rects[j])) {
+                problems.push(`${where}: tiles ${i} and ${j} overlap`);
+              }
+            }
+          }
+          for (const [prev, next] of chainPairs(items)) {
+            if (joinContact(prev, next) < TILE_SHORT - EPSILON) {
+              problems.push(`${where}: tile ${next.idx} not joined face to face`);
+            }
+          }
+          expect(problems).toEqual([]);
+        }
+      }
+    }
+  });
+
+  it("orients doubles crosswise and non-doubles along the chain", () => {
+    const line: PlacedTile[] = [
+      { left: 6, right: 6, seat: 0, opening: true }, // flat -> chain runs vertical
+      { left: 6, right: 3, seat: 1 },
+      { left: 3, right: 3, seat: 2 },
+    ];
+    const items = layoutLine(line, 560);
+    const nonDouble = items.find((i) => i.idx === 1)!;
+    const double = items.find((i) => i.idx === 2)!;
+    expect(nonDouble.vertical).toBe(true); // along a vertical chain
+    expect(double.vertical).toBe(false); // crosswise
+  });
+
+  it("is stable for tiny tables (never loops forever)", () => {
+    for (const size of [240, 280]) {
+      expect(layoutLine(fullLine(0), size).length).toBe(28);
+    }
+  });
+
+  it("still places every tile on the table when space runs out", () => {
+    // On a small table a long chain cannot coil without touching itself, but it
+    // must never lose a tile or spill over the edge.
+    for (const size of [300, 360, 420]) {
+      for (const seat of SEATS) {
+        const items = layoutLine(fullLine(seat), size);
+        expect(items.length).toBe(28);
+        for (const it of items) {
+          const r = rectOf(it);
+          expect(r.x).toBeGreaterThanOrEqual(0);
+          expect(r.y).toBeGreaterThanOrEqual(0);
+          expect(r.x + r.w).toBeLessThanOrEqual(size);
+          expect(r.y + r.h).toBeLessThanOrEqual(size);
+        }
+      }
+    }
+  });
+});
