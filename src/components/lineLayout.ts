@@ -18,7 +18,7 @@ export const TILE_SHORT = 28;
  * Smaller boards lay the chain out at this size and scale the whole table down,
  * so tile size still never changes while a round is being played.
  */
-export const MIN_TABLE = 560;
+export const MIN_TABLE = 580;
 
 export type Dir = "R" | "D" | "L" | "U";
 export type Axis = "h" | "v";
@@ -54,14 +54,16 @@ export function openingIsVertical(open: PlacedTile): boolean {
 }
 
 /**
- * Direction the chain travels: crosswise to an opening double, along an
- * opening non-double.
+ * Direction the chain travels.
+ *
+ * The opening tile is the spinner: it lies flat toward whoever opened, and both
+ * arms leave it crosswise, one from each half, running in opposite directions.
+ * So the chain always travels perpendicular to the tile that started it —
+ * double or not.
  */
 export function lineAxis(line: PlacedTile[]): Axis {
   const open = line.find((t) => t.opening) ?? line[0];
-  const vert = openingIsVertical(open);
-  const dbl = open.left === open.right;
-  return dbl ? (vert ? "h" : "v") : vert ? "v" : "h";
+  return openingIsVertical(open) ? "h" : "v";
 }
 
 function isHorizontalTravel(dir: Dir): boolean {
@@ -271,16 +273,17 @@ export function layoutLine(
   ];
 
   const bwdDir: Dir = axis === "h" ? "L" : "U";
-  const halfAlong = (axis === "h" ? w : h) / 2;
 
-  const fwdStart: [number, number] = [
-    c + VEC[fwdDir][0] * halfAlong,
-    c + VEC[fwdDir][1] * halfAlong,
-  ];
-  const bwdStart: [number, number] = [
-    c + VEC[bwdDir][0] * halfAlong,
-    c + VEC[bwdDir][1] * halfAlong,
-  ];
+  // Each arm leaves from one half of the spinner, so the two runs sit half a
+  // tile apart across the chain — the far end of one tile and the near end of
+  // the other, going opposite ways.
+  const outward = TILE_SHORT / 2; // clear of the spinner's side
+  const halfOffset = TILE_LONG / 4; // centred on its own half of the spinner
+
+  const fwdStart: [number, number] =
+    axis === "h" ? [c + outward, c + halfOffset] : [c + halfOffset, c + outward];
+  const bwdStart: [number, number] =
+    axis === "h" ? [c - outward, c - halfOffset] : [c - halfOffset, c - outward];
 
   const after = line.slice(oIdx + 1).map((p, i) => ({ p, idx: oIdx + 1 + i }));
   const before = line
@@ -290,7 +293,8 @@ export function layoutLine(
 
   // Both arms share one record of what is already on the table, so the second
   // arm never coils into the first.
-  const openAcross = axis === "h" ? h : w;
+  // Each arm runs in a lane the width of the spinner half it left from.
+  const openAcross = TILE_SHORT;
   const placed: Rect[] = [{ x: c - w / 2, y: c - h / 2, w, h }];
 
   items.push(...walk(after, fwdStart, fwdDir, size, margin, true, openAcross, placed));

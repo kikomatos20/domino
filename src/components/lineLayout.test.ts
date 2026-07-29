@@ -109,16 +109,54 @@ function chainPairs(items: LaidTile[]): [LaidTile, LaidTile][] {
 }
 
 describe("lineAxis", () => {
-  it("runs the chain crosswise to an opening double", () => {
-    expect(lineAxis(makeLine(1, 0, true))).toBe("v"); // you open flat -> chain vertical
-    expect(lineAxis(makeLine(1, 2, true))).toBe("v");
-    expect(lineAxis(makeLine(1, 1, true))).toBe("h"); // East opens sideways
-    expect(lineAxis(makeLine(1, 3, true))).toBe("h");
+  it("always runs the chain crosswise to the opening tile", () => {
+    for (const openDouble of [true, false]) {
+      // You and your partner lay it flat, so the chain runs up and down.
+      expect(lineAxis(makeLine(1, 0, openDouble))).toBe("v");
+      expect(lineAxis(makeLine(1, 2, openDouble))).toBe("v");
+      // East and West lay it sideways, so the chain runs left and right.
+      expect(lineAxis(makeLine(1, 1, openDouble))).toBe("h");
+      expect(lineAxis(makeLine(1, 3, openDouble))).toBe("h");
+    }
+  });
+});
+
+describe("the opening tile as spinner", () => {
+  /** East opens 1|6; partner answers the 6, you answer the 1. */
+  const line: PlacedTile[] = [
+    { left: 1, right: 6, seat: 1, opening: true },
+    { left: 6, right: 3, seat: 2 },
+  ];
+  const both: PlacedTile[] = [{ left: 0, right: 1, seat: 0 }, ...line];
+
+  it("sends the two arms off opposite sides, one from each half", () => {
+    const items = layoutLine(both, 560);
+    const open = items.find((i) => i.arm === "open")!;
+    const right = items.find((i) => i.arm === "fwd")!;
+    const left = items.find((i) => i.arm === "bwd")!;
+    const [o, r, l] = [rectOf(open), rectOf(right), rectOf(left)];
+
+    // The spinner lies flat toward East; the answers lie across it.
+    expect(open.vertical).toBe(true);
+    expect(right.vertical).toBe(false);
+    expect(left.vertical).toBe(false);
+
+    // Opposite sides of the spinner.
+    expect(r.x).toBeGreaterThanOrEqual(o.x + o.w - EPSILON);
+    expect(l.x + l.w).toBeLessThanOrEqual(o.x + EPSILON);
+
+    // Each answer covers its own half of the spinner, and they do not share one.
+    expect(r.h).toBe(TILE_SHORT);
+    expect(l.h).toBe(TILE_SHORT);
+    expect(Math.abs(r.y - l.y)).toBe(TILE_SHORT);
+    // The 6 end is the lower half here, so the partner's tile sits low.
+    expect(r.y).toBeGreaterThan(l.y);
   });
 
-  it("runs the chain along an opening non-double", () => {
-    expect(lineAxis(makeLine(1, 0, false))).toBe("h");
-    expect(lineAxis(makeLine(1, 1, false))).toBe("v");
+  it("joins each answer to the spinner half it matches", () => {
+    for (const [prev, next] of chainPairs(layoutLine(both, 560))) {
+      expect(joinContact(prev, next)).toBeGreaterThanOrEqual(TILE_SHORT - EPSILON);
+    }
   });
 });
 

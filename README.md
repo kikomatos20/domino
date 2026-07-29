@@ -15,9 +15,18 @@ The table is square (1:1). Tiles are drawn at a fixed size and never shrink — 
 chain starts in the middle and, when an arm reaches the edge, it turns the corner
 and runs along the border, coiling inward if it goes all the way around.
 
-- The opening tile lies flat toward whoever opened, so you can see who went out.
-- Doubles sit crosswise to the chain; everything else runs along it.
+- **The opening tile is the spinner.** It lies flat toward whoever opened, so you
+  can see who went out, and both arms leave it crosswise — one from each half,
+  running in opposite directions. So if East opens 1|6, the answer to the 6 goes
+  out one side and the answer to the 1 goes out the other.
+- After that, doubles sit crosswise to the chain and everything else runs along it.
+- Corners: a normal tile tucks into the corner square making an L; a crosswise
+  double sits squarely beyond the end. Tiles always meet face to face.
 - Pips are painted on the tile face, so they rotate with the tile.
+
+A full 28-tile chain is 1372px of dominoes and needs a 580px square to coil
+cleanly. Smaller screens lay it out at that size and scale the whole table down,
+so tile size is still fixed for the entire round.
 
 ## The opponents
 
