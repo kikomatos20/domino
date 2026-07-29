@@ -235,15 +235,39 @@ export function reviewRound(history: MoveRecord[], seat: Seat): RoundReview {
       }
 
       if (exposed !== null) {
+        // What the ends were before, and what they are now. A double keeps the
+        // suit it is played on, so it opens nothing new.
+        const endBefore = played.end === "left" ? rec.before.leftEnd! : rec.before.rightEnd!;
+        const otherEnd = played.end === "left" ? rec.before.rightEnd! : rec.before.leftEnd!;
+        const changedTheSuit = exposed !== endBefore;
+        const partnerVoids = k.voids[partner];
+        const partnerStuckBefore =
+          partnerVoids.has(endBefore) && partnerVoids.has(otherEnd);
+        const partnerStuckAfter = partnerVoids.has(exposed) && partnerVoids.has(otherEnd);
+
         // --- your partner ---
-        if (k.voids[partner].has(exposed)) {
+        // Your partner only needs one end. Shutting them out means closing the
+        // last door they had, not merely leaving a suit they cannot use.
+        if (partnerStuckAfter && !partnerStuckBefore) {
           team(
             {
               kind: "minus",
-              text: `You left a ${exposed} open, and your partner has already passed on ${exposed}s. Never open a suit your partner is void in — you are playing fourteen tiles, not seven.`,
+              text: `That closed the last end your partner could use — both ${exposed}s and ${otherEnd}s are suits they have passed on, so they must pass again. You are playing fourteen tiles, not seven.`,
             },
             -2
           );
+        } else if (partnerVoids.has(exposed) && !partnerStuckAfter) {
+          principles.push({
+            kind: "info",
+            team: true,
+            text: `Your partner has passed on ${exposed}s, but the ${otherEnd} end is still open to them, so this does not shut them out.`,
+          });
+        } else if (partnerStuckBefore) {
+          principles.push({
+            kind: "info",
+            team: true,
+            text: `Your partner was already stuck on both ends before this. Once a player passes the roles shift — the lead is effectively yours now, so playing your own game here is right.`,
+          });
         }
 
         const partnerSuits = suitsPlayedBy(rec.before.line, partner);
@@ -299,18 +323,20 @@ export function reviewRound(history: MoveRecord[], seat: Seat): RoundReview {
 
         const rightOpponent = opponents[0];
         const theirSuits = suitsPlayedBy(rec.before.line, rightOpponent, 2);
-        if (theirSuits.has(exposed) && !k.voids[rightOpponent].has(exposed)) {
+        // Only a tile that changes the suit can hand them anything; a double
+        // leaves the end exactly as it already was.
+        if (changedTheSuit && theirSuits.has(exposed) && !k.voids[rightOpponent].has(exposed)) {
           team(
             {
               kind: "minus",
-              text: `You fed a ${exposed} to the opponent on your right, who has been developing that suit. Cover their suit rather than open it.`,
+              text: `You opened a ${exposed} for the opponent on your right, who has been developing that suit. Cover their suit rather than open it.`,
             },
             -1
           );
         }
 
         // A brand-new suit opens the game up for everyone.
-        const fresh = !suitOnTable(rec.before.line, exposed);
+        const fresh = changedTheSuit && !suitOnTable(rec.before.line, exposed);
         if (fresh && k.suitCount[exposed] <= 1 && !partnerSuits.has(exposed)) {
           solo(
             {

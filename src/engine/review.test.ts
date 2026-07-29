@@ -110,6 +110,73 @@ describe("reviewRound", () => {
     expect(review.moves[0].principles.some((n) => n.kind === "minus")).toBe(true);
   });
 
+  it("does not blame you for a suit your partner passed on when the other end is still open to them", () => {
+    // Ends 0 and 1; partner (seat 2) has passed on 0s but not on 1s.
+    // Playing the 0-0 keeps the 0 end as it was and leaves the 1 end alone.
+    const history: MoveRecord[] = [
+      {
+        seat: 0,
+        kind: "play",
+        move: { tileId: "0-0", end: "left" },
+        before: snap({
+          hands: [["0-0", "1-4"], ["2-2"], ["1-5", "6-6"], ["4-4"]],
+          line: [{ left: 0, right: 1, seat: 1, opening: true }],
+          leftEnd: 0,
+          rightEnd: 1,
+          passedOn: [[], [], [0], []],
+        }),
+      },
+    ];
+    const move = reviewRound(history, 0).moves[0];
+    const text = move.principles.map((n) => n.text).join(" ");
+
+    expect(move.principles.some((n) => n.kind === "minus")).toBe(false);
+    expect(text).toMatch(/still open to them|does not shut them out/i);
+    expect(move.verdict === "great" || move.verdict === "good").toBe(true);
+  });
+
+  it("only blames you when the move closes your partner's last end", () => {
+    // Partner has passed on both 0s and 1s, and the move leaves 0 and 1.
+    const history: MoveRecord[] = [
+      {
+        seat: 0,
+        kind: "play",
+        move: { tileId: "0-3", end: "left" },
+        before: snap({
+          hands: [["0-3", "1-2"], ["2-2"], ["6-6"], ["4-4"]],
+          line: [{ left: 3, right: 1, seat: 1, opening: true }],
+          leftEnd: 3,
+          rightEnd: 1,
+          passedOn: [[], [], [0, 1], []],
+        }),
+      },
+    ];
+    const move = reviewRound(history, 0).moves[0];
+    expect(move.principles.some((n) => n.kind === "minus" && n.team)).toBe(true);
+    expect(move.principles.map((n) => n.text).join(" ")).toMatch(/last end/i);
+  });
+
+  it("notes that the lead has shifted once a partner is already stuck", () => {
+    const history: MoveRecord[] = [
+      {
+        seat: 0,
+        kind: "play",
+        move: { tileId: "0-0", end: "left" },
+        before: snap({
+          hands: [["0-0", "1-4"], ["2-2"], ["6-6"], ["4-4"]],
+          line: [{ left: 0, right: 1, seat: 1, opening: true }],
+          leftEnd: 0,
+          rightEnd: 1,
+          passedOn: [[], [], [0, 1], []],
+        }),
+      },
+    ];
+    const text = reviewRound(history, 0)
+      .moves[0].principles.map((n) => n.text)
+      .join(" ");
+    expect(text).toMatch(/roles shift|lead is effectively yours/i);
+  });
+
   it("credits squeezing an opponent who has passed on that suit", () => {
     const history: MoveRecord[] = [
       {
