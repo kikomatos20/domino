@@ -314,7 +314,10 @@ function SnakeLine({
         style={{
           width: virtual,
           height: virtual,
-          transform: scale < 1 ? `scale(${scale})` : undefined,
+          // The box keeps its full size for layout purposes, so it is centred
+          // explicitly rather than by the parent — otherwise the scaled-down
+          // table drifts off centre and gets clipped on small screens.
+          transform: `translate(-50%, -50%) scale(${scale})`,
         }}
       >
         {items.map(({ p, idx, vertical, reversed, x, y }) => {
