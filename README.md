@@ -121,8 +121,37 @@ Or push the repo to GitHub and import it at vercel.com/new.
 - `src/components/` — the game table UI.
 - `src/app/` — Next.js app shell.
 
+## Online play
+
+Private tables with a shareable six-character code. Create one, send the code to
+three friends, and empty seats can be filled by the computer (host's choice, with
+a skill setting).
+
+Turn on the backend by following [SUPABASE.md](./SUPABASE.md) — one free project
+and three environment variables.
+
+**How it is kept honest.** The browser never runs the rules and never holds the
+deck. It sends intentions ("play this tile on that end") to the server, which
+owns the authoritative game state, validates against the same engine the solo
+game uses, and replies with a view containing only that player's own tiles.
+Everyone else's hand is reduced to a count. Row level security denies browsers
+all direct database access, so hidden information stays hidden even if someone
+goes looking with the developer tools.
+
+Other details:
+
+- **Identity without logins.** A per-room token in `localStorage` is your seat.
+  The schema already carries a `user_id` column, so real accounts and ratings can
+  be added later without a rewrite.
+- **Disconnections.** Your seat is held, and the computer covers for you so the
+  table doesn't stall. Come back in the same browser and you get the seat back.
+  With computer cover switched off, the game waits for you instead.
+- **Staying in sync.** Clients poll their own view and reconcile by version
+  number, so a slow reply can never overwrite newer state.
+
 ## Roadmap
 
-- **Phase 1 (this):** play vs computer.
-- **Phase 2:** accounts + live online play (rooms with invite codes).
-- **Phase 3:** ratings, matchmaking, match history — plus other game modes.
+- **Phase 1 (done):** play vs computer.
+- **Phase 2 (done):** private online tables with invite codes.
+- **Phase 3:** public quick-play matchmaking, then accounts, ratings and match
+  history — plus other game modes.

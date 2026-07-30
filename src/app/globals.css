@@ -46,6 +46,235 @@ body {
   opacity: 0.8;
 }
 
+/* ---------- home, lobby, forms ---------- */
+
+.home {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.home-card {
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 28px;
+  width: min(520px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.home-card h1 {
+  font-size: 1.7rem;
+}
+
+.home-card h2 {
+  font-size: 0.95rem;
+  opacity: 0.85;
+}
+
+.home-sub {
+  opacity: 0.75;
+  font-size: 0.9rem;
+}
+
+.home-note {
+  font-size: 0.78rem;
+  opacity: 0.6;
+  line-height: 1.45;
+}
+
+.home-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.home-button {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  padding: 12px 18px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.home-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.home-button.primary {
+  background: var(--gold);
+  color: #1a1a1a;
+  border-color: transparent;
+}
+
+.home-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.panel {
+  background: rgba(0, 0, 0, 0.22);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+
+.field.inline {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.field input,
+.field select {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  color: #fff;
+  padding: 10px 12px;
+  font-size: 1rem;
+}
+
+.field select option {
+  color: #1a1a1a;
+}
+
+.code-input {
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.error {
+  color: #fca5a5;
+  font-size: 0.85rem;
+}
+
+.error-banner {
+  background: #b91c1c;
+}
+
+.back-link {
+  color: #fff;
+  opacity: 0.7;
+  text-decoration: none;
+  font-size: 0.82rem;
+}
+
+.waiting {
+  text-align: center;
+  opacity: 0.75;
+  font-size: 0.9rem;
+  padding: 10px;
+}
+
+.code-badge {
+  align-self: center;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  color: #fff;
+  padding: 12px 22px;
+  font-size: 1.9rem;
+  font-weight: 800;
+  letter-spacing: 0.28em;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.copy-hint {
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  opacity: 0.6;
+  font-weight: 500;
+}
+
+.seat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.seat-card {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 74px;
+}
+
+.seat-card.you {
+  border-color: var(--gold);
+}
+
+.seat-card.empty {
+  opacity: 0.75;
+}
+
+.seat-pos {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+}
+
+.seat-who {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.seat-take {
+  margin-top: auto;
+  align-self: flex-start;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.room-code {
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  opacity: 0.85;
+}
+
 /* ---------- scoreboard ---------- */
 
 .scoreboard {
