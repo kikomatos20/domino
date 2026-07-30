@@ -173,6 +173,22 @@ export function createSupabaseStore(): RoomStore {
       }
     },
 
+    /** Mark a player present without rewriting the game. */
+    async touchPlayer(code, token) {
+      const db = admin();
+      const { data: room } = await db
+        .from("rooms")
+        .select("id")
+        .eq("code", code)
+        .maybeSingle<{ id: string }>();
+      if (!room) return;
+      await db
+        .from("players")
+        .update({ connected: true, last_seen: new Date().toISOString() })
+        .eq("room_id", room.id)
+        .eq("token", token);
+    },
+
     /**
      * Nudge everyone watching the room. Only the version travels — never any
      * game data — so clients refetch their own redacted view.

@@ -7,6 +7,7 @@ import type { PlayerView } from "@/server/types";
 import Board from "./Board";
 import DominoTile from "./DominoTile";
 import ReviewPanel from "./ReviewPanel";
+import { useReplay } from "./useReplay";
 
 /** Seat labels rotate so you are always at the bottom of your own screen. */
 function relativeSeats(you: Seat) {
@@ -45,7 +46,11 @@ export default function OnlineTable({
     () => new Set(game.legalMoves.map((m) => m.tileId)),
     [game.legalMoves]
   );
-  const myTurn = game.currentSeat === you && !game.roundOver && !game.matchOver;
+
+  // Other players' moves arrive in batches; reveal them one at a time.
+  const replay = useReplay(game.line, game.lastAction);
+  const myTurn =
+    game.currentSeat === you && !game.roundOver && !game.matchOver && !replay.catchingUp;
 
   const play = (tileId: TileId) => {
     const options = game.legalMoves.filter((m) => m.tileId === tileId);
@@ -86,17 +91,17 @@ export default function OnlineTable({
       {!error && !myTurn && !game.roundOver && <div className="banner">{turnName}</div>}
 
       <div className="seat seat-north">
-        <OnlineSeat info={seat(around.top)} partner />
+        <OnlineSeat info={seat(around.top)} reveal={game.revealed?.[around.top]} partner />
       </div>
       <div className="seat seat-west">
-        <OnlineSeat info={seat(around.left)} vertical />
+        <OnlineSeat info={seat(around.left)} reveal={game.revealed?.[around.left]} vertical />
       </div>
       <div className="seat seat-east">
-        <OnlineSeat info={seat(around.right)} vertical />
+        <OnlineSeat info={seat(around.right)} reveal={game.revealed?.[around.right]} vertical />
       </div>
 
       <div className="board">
-        {game.line.length === 0 ? (
+        {replay.line.length === 0 ? (
           <div className="board-empty">
             {seat(game.opener).isYou
               ? game.mustOpenWithDoubleSix
@@ -107,7 +112,7 @@ export default function OnlineTable({
                 }`}
           </div>
         ) : (
-          <Board line={game.line} lastAction={game.lastAction} />
+          <Board line={replay.line} lastAction={replay.lastAction} />
         )}
       </div>
 
@@ -166,7 +171,7 @@ export default function OnlineTable({
         </div>
       )}
 
-      {game.roundOver && !reviewing && (
+      {game.roundOver && !reviewing && !replay.catchingUp && (
         <div className="overlay">
           <div className="dialog">
             {game.matchOver ? (
@@ -221,24 +226,42 @@ export default function OnlineTable({
 
 function OnlineSeat({
   info,
+  reveal,
   vertical = false,
   partner = false,
 }: {
   info: PlayerView["seats"][number];
+  /** Their leftover tiles, once the round has finished. */
+  reveal?: string[];
   vertical?: boolean;
   partner?: boolean;
 }) {
+  const pips = reveal?.reduce((sum, id) => {
+    const [a, b] = id.split("-").map(Number);
+    return sum + a + b;
+  }, 0);
+
   return (
     <div className="seat-info">
       <span className="seat-name">
         {info.nickname ?? "Computer"}
         {partner ? " (partner)" : ""}
         {info.nickname && !info.connected ? " · away" : ""}
+        {reveal !== undefined && reveal.length > 0 && (
+          <span className="left-pips"> · {pips}</span>
+        )}
       </span>
       <div className={`backs ${vertical ? "vertical" : ""}`}>
-        {Array.from({ length: info.tilesLeft }, (_, i) => (
-          <DominoTile key={i} left={0} right={0} back small vertical={!vertical} />
-        ))}
+        {reveal
+          ? reveal.map((id) => {
+              const [a, b] = id.split("-").map(Number);
+              return (
+                <DominoTile key={id} left={a} right={b} small vertical={!vertical} />
+              );
+            })
+          : Array.from({ length: info.tilesLeft }, (_, i) => (
+              <DominoTile key={i} left={0} right={0} back small vertical={!vertical} />
+            ))}
       </div>
     </div>
   );

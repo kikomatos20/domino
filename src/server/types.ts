@@ -32,6 +32,11 @@ export interface RoomStore {
   create(room: Room): Promise<void>;
   /** Tell everyone in the room that something changed. */
   notify?(code: string, version: number): Promise<void>;
+  /**
+   * Record that a player is still present, without touching game state.
+   * Kept separate from `put` so a heartbeat can never overwrite a move.
+   */
+  touchPlayer?(code: string, token: string): Promise<void>;
 }
 
 /** What a single player is allowed to see. */
@@ -69,6 +74,11 @@ export interface PlayerView {
     mustPass: boolean;
     /** Your own history only, so the round review still works online. */
     history: GameState["history"];
+    /**
+     * Everyone's leftover tiles, once the round is over and they are no longer
+     * secret. Null while the round is still being played.
+     */
+    revealed: [string[], string[], string[], string[]] | null;
   } | null;
 }
 

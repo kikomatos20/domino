@@ -274,11 +274,14 @@ export function layoutLine(
 
   const bwdDir: Dir = axis === "h" ? "L" : "U";
 
-  // Each arm leaves from one half of the spinner, so the two runs sit half a
-  // tile apart across the chain — the far end of one tile and the near end of
-  // the other, going opposite ways.
   const outward = TILE_SHORT / 2; // clear of the spinner's side
-  const halfOffset = TILE_LONG / 4; // centred on its own half of the spinner
+
+  // On a non-double the two halves show different suits, so each arm has to
+  // leave from its own half and the runs sit half a tile apart. A double shows
+  // the same suit on both halves, so there is nothing to distinguish: the arms
+  // leave from the middle, straight out of either side.
+  const openDouble = open.left === open.right;
+  const halfOffset = openDouble ? 0 : TILE_LONG / 4;
 
   const fwdStart: [number, number] =
     axis === "h" ? [c + outward, c + halfOffset] : [c + halfOffset, c + outward];

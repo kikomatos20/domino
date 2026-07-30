@@ -1,5 +1,10 @@
 # Turning on online play
 
+> **If rooms vanish mid-game** ("No room with that code" after a few moves),
+> this setup has not been done, or the keys have not reached the deployment.
+> Visit `/api/health` on your site — it says exactly what is missing.
+
+
 Everything is built and tested. It needs one thing from you: a free Supabase
 project, so rooms live somewhere real instead of in a single server's memory.
 

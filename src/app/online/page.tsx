@@ -14,7 +14,16 @@ export default function OnlinePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => setNickname(savedNickname()), []);
+  const [health, setHealth] = useState<string | null>(null);
+
+  useEffect(() => {
+    setNickname(savedNickname());
+    // Surface a broken backend here, rather than three moves into a game.
+    fetch("/api/health")
+      .then((r) => r.json())
+      .then((h) => setHealth(h?.ready ? null : (h?.detail ?? null)))
+      .catch(() => {});
+  }, []);
 
   const run = async (fn: () => Promise<string>) => {
     setError(null);
@@ -36,6 +45,8 @@ export default function OnlinePage() {
           ← Back
         </Link>
         <h1>Play with Friends</h1>
+
+        {health && <p className="warn">{health}</p>}
 
         <label className="field">
           <span>Your name</span>

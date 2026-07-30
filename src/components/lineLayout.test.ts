@@ -153,6 +153,26 @@ describe("the opening tile as spinner", () => {
     expect(r.y).toBeGreaterThan(l.y);
   });
 
+  it("sends both arms straight out of the middle when the spinner is a double", () => {
+    // East opens 6|6; the two halves show the same suit, so there is no reason
+    // to stagger the arms.
+    const doubleLine: PlacedTile[] = [
+      { left: 3, right: 6, seat: 0 },
+      { left: 6, right: 6, seat: 1, opening: true },
+      { left: 6, right: 2, seat: 2 },
+    ];
+    const items = layoutLine(doubleLine, 620);
+    const open = rectOf(items.find((i) => i.arm === "open")!);
+    const right = rectOf(items.find((i) => i.arm === "fwd")!);
+    const left = rectOf(items.find((i) => i.arm === "bwd")!);
+
+    // Both answers share the spinner's centre line, rather than sitting on
+    // opposite halves of it.
+    const centre = open.y + open.h / 2;
+    expect(right.y + right.h / 2).toBeCloseTo(centre, 5);
+    expect(left.y + left.h / 2).toBeCloseTo(centre, 5);
+  });
+
   it("joins each answer to the spinner half it matches", () => {
     for (const [prev, next] of chainPairs(layoutLine(both, 560))) {
       expect(joinContact(prev, next)).toBeGreaterThanOrEqual(TILE_SHORT - EPSILON);

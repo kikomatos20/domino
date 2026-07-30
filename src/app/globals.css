@@ -178,6 +178,16 @@ body {
   font-size: 0.85rem;
 }
 
+.warn {
+  background: rgba(180, 83, 9, 0.35);
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  color: #fde68a;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .error-banner {
   background: #b91c1c;
 }
@@ -367,6 +377,21 @@ body {
 .backs {
   display: flex;
   gap: 3px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 130px;
+}
+
+.backs.vertical {
+  max-width: none;
+  max-height: 260px;
+  flex-wrap: wrap;
+}
+
+/* Pips still in a player's hand when the round ends. */
+.left-pips {
+  color: var(--gold);
+  font-weight: 700;
 }
 
 .backs.vertical {

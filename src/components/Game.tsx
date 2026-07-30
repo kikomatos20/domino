@@ -10,6 +10,7 @@ import {
   newMatch,
   nextRound,
   parseTile,
+  tilePips,
 } from "@/engine/engine";
 import { chooseMove } from "@/engine/ai";
 import type { Difficulty } from "@/engine/ai";
@@ -276,17 +277,28 @@ function SeatInfo({
   vertical?: boolean;
 }) {
   const active = state.currentSeat === seat && !state.roundOver && !state.matchOver;
-  const count = state.hands[seat].length;
+  const hand = state.hands[seat];
+  // Once the round is over the tiles are no longer secret — turn them over so
+  // you can see what everyone was left holding, and what it cost.
+  const reveal = state.roundOver !== null;
+  const pips = hand.reduce((sum, id) => sum + tilePips(id), 0);
+
   return (
     <div className={`seat-info ${active ? "active" : ""}`}>
       <span className="seat-name">
         {SEAT_NAMES[seat]}
         {seat === 2 ? " (your partner)" : ""}
+        {reveal && hand.length > 0 && <span className="left-pips"> · {pips}</span>}
       </span>
       <div className={`backs ${vertical ? "vertical" : ""}`}>
-        {Array.from({ length: count }, (_, i) => (
-          <DominoTile key={i} left={0} right={0} back small vertical={!vertical} />
-        ))}
+        {reveal
+          ? hand.map((id) => {
+              const { a, b } = parseTile(id);
+              return <DominoTile key={id} left={a} right={b} small vertical={!vertical} />;
+            })
+          : hand.map((id) => (
+              <DominoTile key={id} left={0} right={0} back small vertical={!vertical} />
+            ))}
       </div>
     </div>
   );

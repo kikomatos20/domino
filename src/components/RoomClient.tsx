@@ -20,9 +20,12 @@ export default function RoomClient({ code }: { code: string }) {
   const [nickname, setNickname] = useState("");
   const version = useRef(-1);
 
+  const misses = useRef(0);
+
   const refresh = useCallback(async () => {
     try {
       const next = await fetchView(code);
+      misses.current = 0;
       // Ignore anything we have already seen, so a slow reply cannot undo a
       // newer state we already applied.
       if (next.version >= version.current) {
@@ -30,7 +33,13 @@ export default function RoomClient({ code }: { code: string }) {
         setView(next);
       }
     } catch (e) {
-      setFatal(e instanceof Error ? e.message : "Could not reach the table");
+      // A single failed poll is usually a blip — a dropped connection, a cold
+      // start. Only give up after several in a row, and never mid-game on the
+      // strength of one bad reply.
+      misses.current += 1;
+      if (misses.current >= 4) {
+        setFatal(e instanceof Error ? e.message : "Could not reach the table");
+      }
     }
   }, [code]);
 

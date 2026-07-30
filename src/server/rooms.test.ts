@@ -149,6 +149,52 @@ describe("hidden information", () => {
     }
   });
 
+  it("does not leak hands through the move history mid-round", async () => {
+    // Every history entry snapshots all four hands. It must stay server-side
+    // until the round is over and the tiles stop being secret.
+    const { code, tokens } = await fourPlayers();
+    await startMatch(store, code, tokens[0]);
+    for (let i = 0; i < 6; i++) {
+      const room = await get(code);
+      if (room.game!.roundOver) break;
+      await playCurrent(code, tokens);
+    }
+
+    const room = await get(code);
+    expect(room.game!.history.length).toBeGreaterThan(0); // the server has it
+
+    for (const token of tokens) {
+      const view = viewFor(room, token);
+      const seat = view.you!.seat;
+      expect(view.game!.history).toEqual([]); // the player does not
+
+      const serialised = JSON.stringify(view);
+      const onTable = new Set(
+        room.game!.line.map((t) => `${Math.min(t.left, t.right)}-${Math.max(t.left, t.right)}`)
+      );
+      for (const other of [0, 1, 2, 3] as Seat[]) {
+        if (other === seat) continue;
+        for (const tile of room.game!.hands[other]) {
+          if (onTable.has(tile)) continue;
+          expect(serialised).not.toContain(`"${tile}"`);
+        }
+      }
+    }
+  });
+
+  it("releases the history for review once the round is over", async () => {
+    const { code, tokens } = await fourPlayers();
+    await startMatch(store, code, tokens[0]);
+    for (let i = 0; i < 200; i++) {
+      const room = await get(code);
+      if (room.game!.roundOver) break;
+      await playCurrent(code, tokens);
+    }
+    const view = viewFor(await get(code), tokens[0]);
+    expect(view.game!.roundOver).not.toBeNull();
+    expect(view.game!.history.length).toBeGreaterThan(0);
+  });
+
   it("shows how many tiles everyone holds, but nothing more", async () => {
     const { code, tokens } = await fourPlayers();
     await startMatch(store, code, tokens[0]);

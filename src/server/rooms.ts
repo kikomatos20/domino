@@ -193,9 +193,15 @@ export async function heartbeat(
   const wasDisconnected = !player.connected;
   player.connected = true;
   player.lastSeen = Date.now();
-  // Only bump the version when something actually changed for other players.
-  if (wasDisconnected) await save(store, room);
-  else await store.put(room);
+
+  if (wasDisconnected) {
+    // Coming back matters to everyone, so publish it.
+    await save(store, room);
+    return;
+  }
+  // A routine ping must never write the game back: the state we read may
+  // already be stale, and rewriting it would undo somebody's move.
+  await store.touchPlayer?.(room.code, token);
 }
 
 // ---------------------------------------------------------------- play
@@ -353,7 +359,15 @@ export function viewFor(room: Room, token: string | null): PlayerView {
             lastAction: game.lastAction,
             legalMoves: legalMoves(game, me.seat),
             mustPass: mustPass(game, me.seat),
-            history: game.history,
+            // Each history entry carries a snapshot of *all four* hands, which
+            // is exactly what the review needs and exactly what an opponent
+            // must never see. Only send it once the round is over and the
+            // tiles are no longer secret.
+            history: game.roundOver ? game.history : [],
+            // Same rule: only once the round has finished.
+            revealed: game.roundOver
+              ? (game.hands.map((h) => [...h]) as [string[], string[], string[], string[]])
+              : null,
           }
         : null,
   };
