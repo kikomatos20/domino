@@ -21,17 +21,23 @@ export default function RoomClient({ code }: { code: string }) {
   const version = useRef(-1);
 
   const misses = useRef(0);
+  const inFlight = useRef(false);
 
   const refresh = useCallback(async () => {
+    // Never poll over the top of our own action — the reply to that is newer
+    // than anything a poll started earlier can return.
+    if (inFlight.current) return;
     try {
       const next = await fetchView(code);
       misses.current = 0;
-      // Ignore anything we have already seen, so a slow reply cannot undo a
-      // newer state we already applied.
-      if (next.version >= version.current) {
+      // Only move forward. Replies can arrive out of order, and re-applying a
+      // version we already have just churns the UI — which is what made the
+      // table feel jumpy.
+      setView((current) => {
+        if (current && next.version <= version.current) return current;
         version.current = next.version;
-        setView(next);
-      }
+        return next;
+      });
     } catch (e) {
       // A single failed poll is usually a blip — a dropped connection, a cold
       // start. Only give up after several in a row, and never mid-game on the
@@ -63,8 +69,10 @@ export default function RoomClient({ code }: { code: string }) {
     async (payload: Record<string, unknown>) => {
       setBusy(true);
       setError(null);
+      inFlight.current = true;
       try {
         const next = await act(code, payload);
+        // Our own action is always the newest thing we know about.
         if (next) {
           version.current = next.version;
           setView(next);
@@ -74,6 +82,7 @@ export default function RoomClient({ code }: { code: string }) {
         // Re-read: the table has probably moved on without us.
         refresh();
       } finally {
+        inFlight.current = false;
         setBusy(false);
       }
     },

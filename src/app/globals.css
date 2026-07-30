@@ -629,6 +629,13 @@ body {
   gap: 6px;
   flex-wrap: wrap;
   justify-content: center;
+  transition: opacity 0.15s ease;
+}
+
+/* Waiting on the server: show that the move was taken, rather than nothing. */
+.hand.sending {
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 .pass-button {

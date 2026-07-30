@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import type { LastAction, PlacedTile } from "@/engine/types";
 
 /**
- * Time between revealed tiles when catching up on other players' moves.
- * Long enough for the placement animation to finish and register.
+ * Time between revealed tiles when catching up on other players' moves. Long
+ * enough for the placement animation to land, but shortened when several tiles
+ * are waiting — nobody wants to sit through four slow replays before their turn.
  */
-const STEP_MS = 1050;
+const STEP_MS = 1000;
+const HURRIED_STEP_MS = 520;
 
 interface Replay {
   line: PlacedTile[];
@@ -58,6 +60,8 @@ export function useReplay(line: PlacedTile[], lastAction: LastAction | null): Re
 
     const missingBefore = offset;
     const missingAfter = line.length - offset - shown.length;
+    const backlog = missingBefore + missingAfter;
+    const step = backlog > 2 ? HURRIED_STEP_MS : STEP_MS;
 
     timer.current = setTimeout(() => {
       // Reveal from the back first, then the front — either order reads fine,
@@ -75,7 +79,7 @@ export function useReplay(line: PlacedTile[], lastAction: LastAction | null): Re
         setJustPlayed(tile);
         setSynthetic({ seat: tile.seat, kind: "play", move: { tileId: "", end: "left" } });
       }
-    }, STEP_MS);
+    }, step);
 
     return () => {
       if (timer.current) clearTimeout(timer.current);

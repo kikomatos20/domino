@@ -133,7 +133,7 @@ export default function OnlineTable({
             No playable tiles — Pass
           </button>
         )}
-        <div className="hand">
+        <div className={`hand ${busy ? "sending" : ""}`}>
           {game.hand.map((id) => {
             const { a, b } = parseTile(id);
             const canPlay = myTurn && playable.has(id) && !busy;

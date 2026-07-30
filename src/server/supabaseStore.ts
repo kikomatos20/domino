@@ -37,6 +37,7 @@ interface RoomRow {
   difficulty: Difficulty;
   target: number;
   host_token: string;
+  version: number;
   updated_at: string;
 }
 
@@ -61,12 +62,17 @@ export function createSupabaseStore(): RoomStore {
       if (!room) return null;
 
       const [{ data: players }, { data: game }] = await Promise.all([
-        db.from("players").select("*").eq("room_id", room.id).returns<PlayerRow[]>(),
+        db
+          .from("players")
+          .select("*")
+          .eq("room_id", room.id)
+          .order("seat")
+          .returns<PlayerRow[]>(),
         db
           .from("games")
-          .select("state, version")
+          .select("state")
           .eq("room_id", room.id)
-          .maybeSingle<{ state: GameState; version: number }>(),
+          .maybeSingle<{ state: GameState }>(),
       ]);
 
       return {
@@ -84,7 +90,8 @@ export function createSupabaseStore(): RoomStore {
           lastSeen: new Date(p.last_seen).getTime(),
         })),
         game: game?.state ?? undefined,
-        version: game?.version ?? 0,
+        // Lives on the room, so it is meaningful in the lobby too.
+        version: room.version ?? 0,
         updatedAt: new Date(room.updated_at).getTime(),
       };
     },
@@ -119,58 +126,33 @@ export function createSupabaseStore(): RoomStore {
       }
     },
 
+    /**
+     * One transaction, one round trip.
+     *
+     * This used to be four separate requests, including a delete-then-insert of
+     * the player rows — anyone reading in that gap saw a room with nobody in it.
+     * `save_room` writes the room, its seats and the game state atomically, so
+     * readers only ever see a complete room.
+     */
     async put(room) {
-      const db = admin();
-      const { data: existing, error } = await db
-        .from("rooms")
-        .select("id")
-        .eq("code", room.code)
-        .single<{ id: string }>();
+      const { error } = await admin().rpc("save_room", {
+        p_code: room.code,
+        p_status: room.status,
+        p_fill: room.fillWithAi,
+        p_difficulty: room.difficulty,
+        p_target: room.target,
+        p_host: room.hostToken,
+        p_version: room.version,
+        p_players: room.players.map((p) => ({
+          seat: p.seat,
+          nickname: p.nickname,
+          token: p.token,
+          connected: p.connected,
+          lastSeen: p.lastSeen,
+        })),
+        p_state: room.game ?? null,
+      });
       if (error) throw error;
-      const roomId = existing.id;
-
-      const { error: roomError } = await db
-        .from("rooms")
-        .update({
-          status: room.status,
-          fill_with_ai: room.fillWithAi,
-          difficulty: room.difficulty,
-          target: room.target,
-          host_token: room.hostToken,
-        })
-        .eq("id", roomId);
-      if (roomError) throw roomError;
-
-      // Seats change rarely and there are at most four; replacing them wholesale
-      // is simpler than diffing and cheap enough.
-      const { error: wipeError } = await db.from("players").delete().eq("room_id", roomId);
-      if (wipeError) throw wipeError;
-      if (room.players.length) {
-        const { error: insertError } = await db.from("players").insert(
-          room.players.map((p) => ({
-            room_id: roomId,
-            seat: p.seat,
-            nickname: p.nickname,
-            token: p.token,
-            connected: p.connected,
-            last_seen: new Date(p.lastSeen).toISOString(),
-          }))
-        );
-        if (insertError) throw insertError;
-      }
-
-      if (room.game) {
-        const { error: gameError } = await db.from("games").upsert(
-          {
-            room_id: roomId,
-            state: room.game,
-            round: room.game.roundNumber,
-            version: room.version,
-          },
-          { onConflict: "room_id" }
-        );
-        if (gameError) throw gameError;
-      }
     },
 
     /** Mark a player present without rewriting the game. */
