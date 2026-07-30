@@ -3,14 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import type { LastAction, PlacedTile } from "@/engine/types";
 
-/** Time between revealed tiles when catching up on other players' moves. */
-const STEP_MS = 850;
+/**
+ * Time between revealed tiles when catching up on other players' moves.
+ * Long enough for the placement animation to finish and register.
+ */
+const STEP_MS = 1050;
 
 interface Replay {
   line: PlacedTile[];
   lastAction: LastAction | null;
   /** True while tiles are still being revealed — the hand stays locked. */
   catchingUp: boolean;
+  /** The tile that just landed, so the table can announce who played it. */
+  justPlayed: PlacedTile | null;
 }
 
 /**
@@ -28,6 +33,7 @@ interface Replay {
 export function useReplay(line: PlacedTile[], lastAction: LastAction | null): Replay {
   const [shown, setShown] = useState<PlacedTile[]>(line);
   const [synthetic, setSynthetic] = useState<LastAction | null>(lastAction);
+  const [justPlayed, setJustPlayed] = useState<PlacedTile | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -60,11 +66,13 @@ export function useReplay(line: PlacedTile[], lastAction: LastAction | null): Re
         const next = line.slice(offset, offset + shown.length + 1);
         const tile = next[next.length - 1];
         setShown(next);
+        setJustPlayed(tile);
         setSynthetic({ seat: tile.seat, kind: "play", move: { tileId: "", end: "right" } });
       } else if (missingBefore > 0) {
         const next = line.slice(offset - 1, offset + shown.length);
         const tile = next[0];
         setShown(next);
+        setJustPlayed(tile);
         setSynthetic({ seat: tile.seat, kind: "play", move: { tileId: "", end: "left" } });
       }
     }, STEP_MS);
@@ -74,7 +82,24 @@ export function useReplay(line: PlacedTile[], lastAction: LastAction | null): Re
     };
   }, [line, shown, lastAction]);
 
-  return { line: shown, lastAction: synthetic, catchingUp: shown.length < line.length };
+  return {
+    line: shown,
+    lastAction: synthetic,
+    catchingUp: shown.length < line.length,
+    justPlayed,
+  };
+}
+
+/** Clear the announcement a moment after the tile lands. */
+export function useFading<T>(value: T, ms: number): T | null {
+  const [shown, setShown] = useState<T | null>(value);
+  useEffect(() => {
+    setShown(value);
+    if (value === null) return;
+    const t = setTimeout(() => setShown(null), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return shown;
 }
 
 /** Where `shown` sits inside `line`, or -1 if it does not. */

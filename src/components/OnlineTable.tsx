@@ -7,7 +7,7 @@ import type { PlayerView } from "@/server/types";
 import Board from "./Board";
 import DominoTile from "./DominoTile";
 import ReviewPanel from "./ReviewPanel";
-import { useReplay } from "./useReplay";
+import { useFading, useReplay } from "./useReplay";
 
 /** Seat labels rotate so you are always at the bottom of your own screen. */
 function relativeSeats(you: Seat) {
@@ -69,6 +69,13 @@ export default function OnlineTable({
     ? "Your turn"
     : `${whoseTurn.nickname ?? "Computer"}'s turn`;
 
+  // Announce each tile as it lands, so you can follow a batch of moves that
+  // arrived together.
+  const played = useFading(replay.justPlayed, 1500);
+  const playedBanner = played
+    ? `${seat(played.seat).isYou ? "You" : (seat(played.seat).nickname ?? "Computer")} played ${Math.min(played.left, played.right)} | ${Math.max(played.left, played.right)}`
+    : null;
+
   return (
     <main className="table-root">
       <header className="scoreboard">
@@ -88,7 +95,10 @@ export default function OnlineTable({
       </header>
 
       {error && <div className="banner error-banner">{error}</div>}
-      {!error && !myTurn && !game.roundOver && <div className="banner">{turnName}</div>}
+      {!error && playedBanner && <div className="banner played-banner">{playedBanner}</div>}
+      {!error && !playedBanner && !myTurn && !game.roundOver && (
+        <div className="banner">{turnName}</div>
+      )}
 
       <div className="seat seat-north">
         <OnlineSeat info={seat(around.top)} reveal={game.revealed?.[around.top]} partner />
