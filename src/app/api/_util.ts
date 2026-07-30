@@ -6,7 +6,9 @@ export function fail(error: unknown) {
   if (error instanceof RoomError) {
     return NextResponse.json({ error: error.message }, { status: error.status });
   }
-  console.error("[domino] unexpected error", error);
+  // Supabase rejects with plain objects rather than Errors, so log the whole
+  // thing — `error.message` alone would come out empty.
+  console.error("[domino] unexpected error", JSON.stringify(error, null, 2), error);
   return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
 }
 
