@@ -104,12 +104,24 @@ export default function FeedbackForm({
               ].map((r) => (
                 <button
                   key={r.value}
+                  type="button"
+                  aria-pressed={rating === r.value}
                   className={`rating ${rating === r.value ? "on" : ""}`}
-                  onClick={() => setRating(rating === r.value ? null : r.value)}
+                  // Tapping again keeps the choice rather than clearing it. It
+                  // used to toggle off, so a second tap on the same button —
+                  // easy if you could not tell the first had registered —
+                  // silently threw the rating away.
+                  onClick={() => setRating(r.value)}
                 >
+                  {rating === r.value ? "✓ " : ""}
                   {r.label}
                 </button>
               ))}
+              {rating !== null && (
+                <button type="button" className="rating clear" onClick={() => setRating(null)}>
+                  Clear
+                </button>
+              )}
             </div>
 
             <textarea

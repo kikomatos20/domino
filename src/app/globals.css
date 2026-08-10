@@ -343,17 +343,36 @@ body {
 .rating {
   flex: 1;
   background: #f1f1f1;
-  border: 1px solid transparent;
+  border: 2px solid transparent;
   border-radius: 8px;
-  padding: 7px;
-  font-size: 0.82rem;
-  font-weight: 600;
+  padding: 9px 7px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #444;
   cursor: pointer;
+  transition:
+    background 0.12s ease,
+    transform 0.12s ease;
 }
 
+.rating:active {
+  transform: scale(0.96);
+}
+
+/* Unmissable when chosen: colour, border and a tick. */
 .rating.on {
-  background: var(--felt-dark);
-  color: #fff;
+  background: var(--gold);
+  border-color: #a16207;
+  color: #1a1a1a;
+  box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.28);
+}
+
+.rating.clear {
+  flex: 0 0 auto;
+  background: none;
+  border-color: #ddd;
+  color: #888;
+  font-weight: 500;
 }
 
 .dispute {
