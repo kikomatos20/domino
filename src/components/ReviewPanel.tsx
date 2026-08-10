@@ -18,10 +18,15 @@ export default function ReviewPanel({
   history,
   seat,
   onClose,
+  mode,
+  roomCode,
 }: {
   history: MoveRecord[];
   seat: Seat;
   onClose: () => void;
+  /** Carried into any feedback sent from here, so reports say where they came from. */
+  mode?: "solo" | "online";
+  roomCode?: string | null;
 }) {
   const review = useMemo(() => reviewRound(history, seat), [history, seat]);
   const [lens, setLens] = useState<"principles" | "engine">("principles");
@@ -81,6 +86,8 @@ export default function ReviewPanel({
               onDispute={() =>
                 setDisputing({
                   kind: "review",
+                  mode,
+                  roomCode,
                   about: `Move ${m.number}: ${m.headline}`,
                   payload: {
                     verdict: m.verdict,

@@ -229,6 +229,7 @@ export default function Game() {
         <ReviewPanel
           history={lastRound}
           seat={HUMAN}
+          mode="solo"
           onClose={() => setReviewing(false)}
         />
       )}

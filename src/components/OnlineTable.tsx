@@ -187,7 +187,13 @@ export default function OnlineTable({
       )}
 
       {reviewing && (
-        <ReviewPanel history={game.history} seat={you} onClose={() => setReviewing(false)} />
+        <ReviewPanel
+          history={game.history}
+          seat={you}
+          mode="online"
+          roomCode={view.code}
+          onClose={() => setReviewing(false)}
+        />
       )}
 
       <FeedbackButton
