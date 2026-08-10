@@ -3,20 +3,30 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { LastAction, PlacedTile, Seat } from "@/engine/types";
 import DominoTile from "./DominoTile";
-import { MIN_TABLE, layoutLine } from "./lineLayout";
+import { MIN_TABLE, TILE_LONG, TILE_SHORT, layoutLine } from "./lineLayout";
 
 /**
  * The table: the chain of tiles as it sits in front of the players. Shared by
  * the solo game and the online room so both look and behave identically.
  */
+/** Where each open end of the chain sits on screen, for dropping tiles onto. */
+export interface EndAnchors {
+  left: { x: number; y: number } | null;
+  right: { x: number; y: number } | null;
+}
+
 export default function Board({
   line,
   lastAction,
+  onEnds,
 }: {
   line: PlacedTile[];
   lastAction: LastAction | null;
+  /** Reports the screen position of both open ends whenever they move. */
+  onEnds?: (ends: EndAnchors) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
 
   useEffect(() => {
@@ -51,10 +61,53 @@ export default function Board({
     3: ["-150px", "0px"],
   };
 
+  // Tell the hand where the two ends are, in screen coordinates, so a dragged
+  // tile can be dropped onto one of them. Recomputed whenever the chain or the
+  // table geometry changes.
+  useEffect(() => {
+    if (!onEnds) return;
+    const table = tableRef.current;
+    if (!table || items.length === 0) {
+      onEnds?.({ left: null, right: null });
+      return;
+    }
+    const rect = table.getBoundingClientRect();
+    const VEC: Record<string, [number, number]> = {
+      R: [1, 0],
+      D: [0, 1],
+      L: [-1, 0],
+      U: [0, -1],
+    };
+
+    /**
+     * A point just beyond the open end, where the next tile would actually go.
+     * Sitting it outside the chain keeps the two targets apart even when the
+     * table holds nothing but the spinner, where both ends are the same tile.
+     */
+    const anchor = (idx: number, isRightEnd: boolean) => {
+      const it = items.find((i) => i.idx === idx);
+      if (!it) return null;
+      const w = it.vertical ? TILE_SHORT : TILE_LONG;
+      const h = it.vertical ? TILE_LONG : TILE_SHORT;
+      // The opening tile stores the forward direction, so the left end has to
+      // look the other way.
+      const flip = it.arm === "open" && !isRightEnd;
+      const [dx, dy] = VEC[it.dir] ?? [1, 0];
+      const reach = (Math.abs(dx) ? w : h) / 2 + TILE_SHORT;
+      const sign = flip ? -1 : 1;
+      return {
+        x: rect.left + (it.x + w / 2 + dx * sign * reach) * scale,
+        y: rect.top + (it.y + h / 2 + dy * sign * reach) * scale,
+      };
+    };
+    onEnds({ left: anchor(0, false), right: anchor(line.length - 1, true) });
+  }, [items, scale, line.length, onEnds, box.w, box.h]);
+
   return (
     <div className="snake" ref={ref}>
       <div
         className="table-square"
+        ref={tableRef}
         style={{
           width: virtual,
           height: virtual,

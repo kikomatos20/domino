@@ -46,6 +46,7 @@ export interface DominoTileProps {
   highlight?: boolean;
   dimmed?: boolean;
   onClick?: () => void;
+  onPointerDown?: (e: React.PointerEvent) => void;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -59,6 +60,7 @@ export default function DominoTile({
   highlight = false,
   dimmed = false,
   onClick,
+  onPointerDown,
   className = "",
   style,
 }: DominoTileProps) {
@@ -76,7 +78,13 @@ export default function DominoTile({
     .join(" ");
 
   return (
-    <div className={cls} style={style} onClick={onClick} role={onClick ? "button" : undefined}>
+    <div
+      className={cls}
+      style={style}
+      onClick={onClick}
+      onPointerDown={onPointerDown}
+      role={onClick || onPointerDown ? "button" : undefined}
+    >
       {!back && (
         <>
           <Half value={left} rotated={!vertical} />

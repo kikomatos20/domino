@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { parseTile } from "@/engine/engine";
+import { useState } from "react";
 import type { End, Seat, TileId } from "@/engine/types";
 import type { PlayerView } from "@/server/types";
 import Board from "./Board";
+import type { EndAnchors } from "./Board";
 import DominoTile from "./DominoTile";
+import PlayableHand from "./PlayableHand";
 import ReviewPanel from "./ReviewPanel";
 import { useFading, useReplay } from "./useReplay";
 
@@ -34,30 +35,18 @@ export default function OnlineTable({
   busy: boolean;
   error: string | null;
 }) {
-  const [pendingTile, setPendingTile] = useState<TileId | null>(null);
   const [reviewing, setReviewing] = useState(false);
+  const [ends, setEnds] = useState<EndAnchors>({ left: null, right: null });
 
   const game = view.game!;
   const you = view.you!.seat;
   const around = relativeSeats(you);
   const seat = (s: Seat) => view.seats[s];
 
-  const playable = useMemo(
-    () => new Set(game.legalMoves.map((m) => m.tileId)),
-    [game.legalMoves]
-  );
-
   // Other players' moves arrive in batches; reveal them one at a time.
   const replay = useReplay(game.line, game.lastAction);
   const myTurn =
     game.currentSeat === you && !game.roundOver && !game.matchOver && !replay.catchingUp;
-
-  const play = (tileId: TileId) => {
-    const options = game.legalMoves.filter((m) => m.tileId === tileId);
-    if (options.length === 0) return;
-    if (options.length > 1) return setPendingTile(tileId);
-    onMove(tileId, options[0].end);
-  };
 
   // Your team is the one you sit on: seats 0 & 2 against 1 & 3.
   const yourTeam = you % 2;
@@ -122,64 +111,28 @@ export default function OnlineTable({
                 }`}
           </div>
         ) : (
-          <Board line={replay.line} lastAction={replay.lastAction} />
+          <Board line={replay.line} lastAction={replay.lastAction} onEnds={setEnds} />
         )}
       </div>
 
       <div className="hand-area">
-        {myTurn && !game.mustPass && <div className="turn-hint">Your turn</div>}
+        {myTurn && !game.mustPass && (
+          <div className="turn-hint">Your turn — drag a tile onto an end</div>
+        )}
         {myTurn && game.mustPass && (
           <button className="pass-button" disabled={busy} onClick={onPass}>
             No playable tiles — Pass
           </button>
         )}
-        <div className={`hand ${busy ? "sending" : ""}`}>
-          {game.hand.map((id) => {
-            const { a, b } = parseTile(id);
-            const canPlay = myTurn && playable.has(id) && !busy;
-            return (
-              <DominoTile
-                key={id}
-                left={a}
-                right={b}
-                vertical
-                highlight={canPlay}
-                dimmed={myTurn && !playable.has(id)}
-                onClick={canPlay ? () => play(id) : undefined}
-              />
-            );
-          })}
-        </div>
+        <PlayableHand
+          tiles={game.hand}
+          legalMoves={game.legalMoves}
+          ends={ends}
+          yourTurn={myTurn}
+          disabled={busy}
+          onPlay={onMove}
+        />
       </div>
-
-      {pendingTile && (
-        <div className="overlay" onClick={() => setPendingTile(null)}>
-          <div className="dialog" onClick={(e) => e.stopPropagation()}>
-            <p>Play {pendingTile.replace("-", "|")} on which end?</p>
-            <div className="dialog-buttons">
-              <button
-                onClick={() => {
-                  onMove(pendingTile, "left");
-                  setPendingTile(null);
-                }}
-              >
-                Left ({game.leftEnd})
-              </button>
-              <button
-                onClick={() => {
-                  onMove(pendingTile, "right");
-                  setPendingTile(null);
-                }}
-              >
-                Right ({game.rightEnd})
-              </button>
-            </div>
-            <button className="link" onClick={() => setPendingTile(null)}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
 
       {game.roundOver && !reviewing && !replay.catchingUp && (
         <div className="overlay">

@@ -16,8 +16,10 @@ import { chooseMove } from "@/engine/ai";
 import type { Difficulty } from "@/engine/ai";
 import type { End, GameState, LastAction, PlacedTile, Seat, TileId } from "@/engine/types";
 import DominoTile from "./DominoTile";
+import PlayableHand from "./PlayableHand";
 import ReviewPanel from "./ReviewPanel";
 import Board from "./Board";
+import type { EndAnchors } from "./Board";
 
 const SEAT_NAMES: Record<Seat, string> = { 0: "You", 1: "East", 2: "Partner", 3: "West" };
 const AI_DELAY_MS = 1800;
@@ -25,8 +27,8 @@ const HUMAN: Seat = 0;
 
 export default function Game() {
   const [state, setState] = useState<GameState | null>(null);
-  const [pendingTile, setPendingTile] = useState<TileId | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
+  const [ends, setEnds] = useState<EndAnchors>({ left: null, right: null });
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [reviewing, setReviewing] = useState(false);
   /** History of the round just finished, kept so review survives the next deal. */
@@ -41,7 +43,6 @@ export default function Game() {
     () => (state ? legalMoves(state, HUMAN) : []),
     [state]
   );
-  const playableTiles = useMemo(() => new Set(myMoves.map((m) => m.tileId)), [myMoves]);
 
   // AI turns.
   useEffect(() => {
@@ -76,23 +77,15 @@ export default function Game() {
   }, [banner]);
 
 
-  const playHuman = useCallback(
-    (tileId: TileId, end?: End) => {
-      setState((s) => {
-        if (!s) return s;
-        const options = legalMoves(s, HUMAN).filter((m) => m.tileId === tileId);
-        if (options.length === 0) return s;
-        if (options.length > 1 && !end) {
-          setPendingTile(tileId);
-          return s;
-        }
-        const move = end ? options.find((m) => m.end === end)! : options[0];
-        setPendingTile(null);
-        return applyMove(s, HUMAN, move);
-      });
-    },
-    []
-  );
+  const playHuman = useCallback((tileId: TileId, end: End) => {
+    setState((s) => {
+      if (!s) return s;
+      const move = legalMoves(s, HUMAN).find(
+        (m) => m.tileId === tileId && m.end === end
+      );
+      return move ? applyMove(s, HUMAN, move) : s;
+    });
+  }, []);
 
   if (!state) {
     return <main className="table-root loading">Setting up the table…</main>;
@@ -152,13 +145,15 @@ export default function Game() {
               : `${SEAT_NAMES[state.opener]} open${state.opener === HUMAN ? "" : "s"} this round`}
           </div>
         ) : (
-          <Board line={state.line} lastAction={state.lastAction} />
+          <Board line={state.line} lastAction={state.lastAction} onEnds={setEnds} />
         )}
       </div>
 
       {/* Human hand */}
       <div className="hand-area">
-        {humanTurn && !humanMustPass && <div className="turn-hint">Your turn</div>}
+        {humanTurn && !humanMustPass && (
+          <div className="turn-hint">Your turn — drag a tile onto an end</div>
+        )}
         {humanMustPass && (
           <button
             className="pass-button"
@@ -170,44 +165,14 @@ export default function Game() {
             No playable tiles — Pass
           </button>
         )}
-        <div className="hand">
-          {state.hands[HUMAN].map((id) => {
-            const { a, b } = parseTile(id);
-            const playable = humanTurn && playableTiles.has(id);
-            return (
-              <DominoTile
-                key={id}
-                left={a}
-                right={b}
-                vertical
-                highlight={playable}
-                dimmed={humanTurn && !playable}
-                onClick={playable ? () => playHuman(id) : undefined}
-              />
-            );
-          })}
-        </div>
+        <PlayableHand
+          tiles={state.hands[HUMAN]}
+          legalMoves={myMoves}
+          ends={ends}
+          yourTurn={humanTurn}
+          onPlay={playHuman}
+        />
       </div>
-
-      {/* End chooser */}
-      {pendingTile && (
-        <div className="overlay" onClick={() => setPendingTile(null)}>
-          <div className="dialog" onClick={(e) => e.stopPropagation()}>
-            <p>Play {pendingTile.replace("-", "|")} on which end?</p>
-            <div className="dialog-buttons">
-              <button onClick={() => playHuman(pendingTile, "left")}>
-                Left ({state.leftEnd})
-              </button>
-              <button onClick={() => playHuman(pendingTile, "right")}>
-                Right ({state.rightEnd})
-              </button>
-            </div>
-            <button className="link" onClick={() => setPendingTile(null)}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Round / match end */}
       {state.roundOver && !reviewing && (

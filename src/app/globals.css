@@ -595,6 +595,80 @@ body {
   transform: translateY(-6px);
 }
 
+/* ---------- dragging a tile onto the table ---------- */
+
+.tile.grabbable {
+  cursor: grab;
+  /* Stop the browser scrolling the page when you drag a tile on a phone. */
+  touch-action: none;
+  transition: transform 0.12s ease;
+}
+
+.tile.grabbable:hover {
+  transform: translateY(-6px);
+}
+
+/* Picked up: left in place as a reminder of where it came from. */
+.tile.lifted {
+  transform: translateY(-10px);
+  opacity: 0.75;
+}
+
+.tile.dragging {
+  opacity: 0.3;
+}
+
+/* The tile that follows your finger. */
+.drag-ghost {
+  position: fixed;
+  z-index: 200;
+  transform: translate(-50%, -60%) scale(1.1) rotate(-3deg);
+  pointer-events: none;
+  filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.55));
+}
+
+/* Where you can drop it. */
+.drop-target {
+  position: fixed;
+  z-index: 150;
+  width: 84px;
+  height: 84px;
+  margin: -42px 0 0 -42px;
+  border-radius: 50%;
+  border: 2px dashed rgba(255, 255, 255, 0.55);
+  background: rgba(234, 179, 8, 0.16);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  animation: target-in 0.16s ease-out;
+}
+
+.drop-target.over {
+  border-style: solid;
+  border-color: var(--gold);
+  background: rgba(234, 179, 8, 0.4);
+  transform: scale(1.12);
+  box-shadow: 0 0 22px rgba(234, 179, 8, 0.6);
+}
+
+.drop-label {
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.9;
+}
+
+@keyframes target-in {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .tile.highlight {
   box-shadow:
     0 0 0 2px var(--gold),
