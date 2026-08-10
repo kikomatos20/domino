@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseTile } from "@/engine/engine";
 import type { End, Move, TileId } from "@/engine/types";
 import DominoTile from "./DominoTile";
+import ZoomedTile, { HOLD_MS } from "./ZoomedTile";
 import type { EndAnchors } from "./Board";
 
 /** How close to an end you have to drop for it to count. */
@@ -43,7 +44,16 @@ export default function PlayableHand({
 }) {
   const [drag, setDrag] = useState<Drag | null>(null);
   const [armed, setArmed] = useState<TileId | null>(null);
+  const [zoomed, setZoomed] = useState<TileId | null>(null);
   const start = useRef<{ x: number; y: number } | null>(null);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Set when a hold magnified the tile, so releasing does not also play it. */
+  const held = useRef(false);
+
+  const cancelHold = useCallback(() => {
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+    holdTimer.current = null;
+  }, []);
 
   const movesFor = useCallback(
     (tileId: TileId) => legalMoves.filter((m) => m.tileId === tileId),
@@ -93,12 +103,30 @@ export default function PlayableHand({
           ? Math.hypot(e.clientX - start.current.x, e.clientY - start.current.y) >
             DRAG_THRESHOLD
           : false);
+      // Moving means you meant to drag, not to inspect.
+      if (moved) {
+        cancelHold();
+        if (held.current) {
+          held.current = false;
+          setZoomed(null);
+        }
+      }
       setDrag((d) => (d ? { ...d, x: e.clientX, y: e.clientY, moved } : d));
     };
 
     const up = (e: PointerEvent) => {
+      cancelHold();
       const options = movesFor(drag.tileId);
       const dropped = drag.moved ? endUnder(e.clientX, e.clientY) : null;
+
+      // A hold was for a closer look — let go without playing anything.
+      if (held.current) {
+        held.current = false;
+        setZoomed(null);
+        setDrag(null);
+        start.current = null;
+        return;
+      }
 
       if (dropped) {
         setArmed(null);
@@ -125,7 +153,9 @@ export default function PlayableHand({
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
     };
-  }, [drag, endUnder, movesFor, onPlay]);
+  }, [drag, endUnder, movesFor, onPlay, cancelHold]);
+
+  useEffect(() => cancelHold, [cancelHold]);
 
   // Tapping an end while a tile is armed plays it there.
   useEffect(() => {
@@ -165,13 +195,38 @@ export default function PlayableHand({
               className={`${usable ? "grabbable" : ""} ${isActive ? "lifted" : ""} ${
                 drag?.tileId === id && drag.moved ? "dragging" : ""
               }`}
-              onPointerDown={
+              onPointerDown={(e) => {
+                // Hold any tile — playable or not — to read it properly.
+                held.current = false;
+                cancelHold();
+                holdTimer.current = setTimeout(() => {
+                  held.current = true;
+                  setZoomed(id);
+                }, HOLD_MS);
+
+                if (usable) {
+                  start.current = { x: e.clientX, y: e.clientY };
+                  setDrag({ tileId: id, x: e.clientX, y: e.clientY, moved: false });
+                }
+              }}
+              onPointerUp={
+                // Tiles you cannot play have no drag, so end the hold here.
                 usable
-                  ? (e) => {
-                      start.current = { x: e.clientX, y: e.clientY };
-                      setDrag({ tileId: id, x: e.clientX, y: e.clientY, moved: false });
+                  ? undefined
+                  : () => {
+                      cancelHold();
+                      held.current = false;
+                      setZoomed(null);
                     }
-                  : undefined
+              }
+              onPointerCancel={
+                usable
+                  ? undefined
+                  : () => {
+                      cancelHold();
+                      held.current = false;
+                      setZoomed(null);
+                    }
               }
             />
           );
@@ -194,6 +249,16 @@ export default function PlayableHand({
             </div>
           );
         })}
+
+      {zoomed && (
+        <ZoomedTile
+          tileId={zoomed}
+          onClose={() => {
+            held.current = false;
+            setZoomed(null);
+          }}
+        />
+      )}
 
       {/* The tile under your finger. */}
       {drag && drag.moved && (

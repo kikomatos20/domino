@@ -47,6 +47,9 @@ export interface DominoTileProps {
   dimmed?: boolean;
   onClick?: () => void;
   onPointerDown?: (e: React.PointerEvent) => void;
+  onPointerUp?: (e: React.PointerEvent) => void;
+  onPointerCancel?: (e: React.PointerEvent) => void;
+  onPointerLeave?: (e: React.PointerEvent) => void;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -61,6 +64,9 @@ export default function DominoTile({
   dimmed = false,
   onClick,
   onPointerDown,
+  onPointerUp,
+  onPointerCancel,
+  onPointerLeave,
   className = "",
   style,
 }: DominoTileProps) {
@@ -83,6 +89,9 @@ export default function DominoTile({
       style={style}
       onClick={onClick}
       onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+      onPointerLeave={onPointerLeave}
       role={onClick || onPointerDown ? "button" : undefined}
     >
       {!back && (

@@ -3,18 +3,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { LastAction, PlacedTile, Seat } from "@/engine/types";
 import DominoTile from "./DominoTile";
+import ZoomedTile, { HOLD_MS } from "./ZoomedTile";
 import { MIN_TABLE, TILE_LONG, TILE_SHORT, layoutLine } from "./lineLayout";
 
-/**
- * The table: the chain of tiles as it sits in front of the players. Shared by
- * the solo game and the online room so both look and behave identically.
- */
 /** Where each open end of the chain sits on screen, for dropping tiles onto. */
 export interface EndAnchors {
   left: { x: number; y: number } | null;
   right: { x: number; y: number } | null;
 }
 
+/**
+ * The table: the chain of tiles as it sits in front of the players. Shared by
+ * the solo game and the online room so both look and behave identically.
+ */
 export default function Board({
   line,
   lastAction,
@@ -28,6 +29,15 @@ export default function Board({
   const ref = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
+  // Tiles on the table are the smallest thing on screen; hold one to read it.
+  const [zoomed, setZoomed] = useState<string | null>(null);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const endHold = () => {
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+    holdTimer.current = null;
+  };
+  useEffect(() => endHold, []);
 
   useEffect(() => {
     const el = ref.current;
@@ -140,11 +150,21 @@ export default function Board({
                     ? ({ "--fx": fx, "--fy": fy } as React.CSSProperties)
                     : undefined
                 }
+                onPointerDown={() => {
+                  endHold();
+                  const id = `${Math.min(p.left, p.right)}-${Math.max(p.left, p.right)}`;
+                  holdTimer.current = setTimeout(() => setZoomed(id), HOLD_MS);
+                }}
+                onPointerUp={endHold}
+                onPointerCancel={endHold}
+                onPointerLeave={endHold}
               />
             </div>
           );
         })}
       </div>
+
+      {zoomed && <ZoomedTile tileId={zoomed} onClose={() => setZoomed(null)} />}
     </div>
   );
 }
