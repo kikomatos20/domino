@@ -16,13 +16,15 @@ import { chooseMove } from "@/engine/ai";
 import type { Difficulty } from "@/engine/ai";
 import type { End, GameState, LastAction, PlacedTile, Seat, TileId } from "@/engine/types";
 import DominoTile from "./DominoTile";
+import FeedbackButton from "./FeedbackButton";
 import PlayableHand from "./PlayableHand";
 import ReviewPanel from "./ReviewPanel";
 import Board from "./Board";
 import type { EndAnchors } from "./Board";
 
 const SEAT_NAMES: Record<Seat, string> = { 0: "You", 1: "East", 2: "Partner", 3: "West" };
-const AI_DELAY_MS = 1800;
+/** Long enough to watch each computer play land and read who played what. */
+const AI_DELAY_MS = 2500;
 const HUMAN: Seat = 0;
 
 export default function Game() {
@@ -63,6 +65,18 @@ export default function Game() {
     }, AI_DELAY_MS);
     return () => clearTimeout(t);
   }, [state, difficulty]);
+
+  // Nothing playable is not a decision, so take the turn automatically and just
+  // say so — clicking a button to confirm you are stuck is busywork.
+  useEffect(() => {
+    if (!state || state.roundOver || state.matchOver) return;
+    if (state.currentSeat !== HUMAN || !mustPass(state, HUMAN)) return;
+    const t = setTimeout(() => {
+      setBanner("You had nothing to play — turn skipped");
+      setState((s) => (s && mustPass(s, HUMAN) ? applyPass(s, HUMAN) : s));
+    }, 1400);
+    return () => clearTimeout(t);
+  }, [state]);
 
   // Keep the finished round's history available for review.
   useEffect(() => {
@@ -155,15 +169,7 @@ export default function Game() {
           <div className="turn-hint">Your turn — drag a tile onto an end</div>
         )}
         {humanMustPass && (
-          <button
-            className="pass-button"
-            onClick={() => {
-              setBanner("You passed");
-              setState((s) => (s && mustPass(s, HUMAN) ? applyPass(s, HUMAN) : s));
-            }}
-          >
-            No playable tiles — Pass
-          </button>
+          <div className="skipped-note">Nothing you can play — skipping your turn</div>
         )}
         <PlayableHand
           tiles={state.hands[HUMAN]}
@@ -226,6 +232,22 @@ export default function Game() {
           onClose={() => setReviewing(false)}
         />
       )}
+
+      <FeedbackButton
+        context={() => ({
+          kind: "general",
+          mode: "solo",
+          about: `Round ${state.roundNumber} against the computer (${difficulty})`,
+          payload: {
+            line: state.line,
+            ends: [state.leftEnd, state.rightEnd],
+            hand: state.hands[HUMAN],
+            currentSeat: state.currentSeat,
+            matchScore: state.matchScore,
+            difficulty,
+          },
+        })}
+      />
     </main>
   );
 }

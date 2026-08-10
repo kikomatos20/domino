@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyMove, applyPass, newMatch } from "./engine";
 import { chooseMove } from "./ai";
-import { reviewRound } from "./review";
+import { manoAt, reviewRound, roleOf } from "./review";
 import type { GameState, MoveRecord, Seat, Snapshot } from "./types";
 
 function seededRng(seed: number) {
@@ -177,6 +177,171 @@ describe("reviewRound", () => {
     expect(text).toMatch(/roles shift|lead is effectively yours/i);
   });
 
+  it("treats matching ends as one decision, not a choice of sides", () => {
+    // Both ends show a 4 and you hold a single 4 — left or right is the same
+    // move, and grading which side you picked would be meaningless.
+    const history: MoveRecord[] = [
+      {
+        seat: 0,
+        kind: "play",
+        move: { tileId: "4-2", end: "right" },
+        before: snap({
+          hands: [["4-2", "6-6"], ["1-1"], ["3-3"], ["5-5"]],
+          line: [
+            { left: 4, right: 1, seat: 1, opening: true },
+            { left: 1, right: 4, seat: 2 },
+          ],
+          leftEnd: 4,
+          rightEnd: 4,
+        }),
+      },
+    ];
+    const move = reviewRound(history, 0).moves[0];
+    expect(move.choices).toBe(1);
+    expect(move.verdict).toBe("good");
+    expect(move.engine).toBeNull();
+    expect(move.principles.map((n) => n.text).join(" ")).toMatch(/nothing to decide/i);
+  });
+
+  it("praises opening a suit you hold every remaining tile of", () => {
+    // The 2s: you hold 2-5, and every other 2 is already on the table, so
+    // exposing a 2 strands everyone else rather than helping them.
+    const history: MoveRecord[] = [
+      {
+        seat: 0,
+        kind: "play",
+        move: { tileId: "2-6", end: "right" },
+        before: snap({
+          // Five of the seven 2s are already down; the other two (2-5, 2-6)
+          // are both in your hand.
+          hands: [["2-6", "2-5", "0-1"], ["1-1"], ["3-3"], ["5-5"]],
+          line: [
+            { left: 0, right: 2, seat: 1, opening: true },
+            { left: 2, right: 2, seat: 2 },
+            { left: 2, right: 3, seat: 3 },
+            { left: 3, right: 1, seat: 0 },
+            { left: 1, right: 2, seat: 1 },
+            { left: 2, right: 4, seat: 2 },
+            { left: 4, right: 6, seat: 3 },
+          ],
+          leftEnd: 0,
+          rightEnd: 6,
+        }),
+      },
+    ];
+    const move = reviewRound(history, 0).moves[0];
+    const text = move.principles.map((n) => n.text).join(" ");
+    // Whatever else it says, it must not treat a controlled suit as a gift.
+    expect(text).not.toMatch(/opened a .* for the opponent/i);
+    expect(move.verdict === "great" || move.verdict === "good").toBe(true);
+  });
+
+  it("moves the lead when the mano passes", () => {
+    // Seat 1 opened, then passed. Everyone else has played, so seat 1 no longer
+    // holds the fewest tiles and the lead has moved on.
+    const hands: [string[], string[], string[], string[]] = [
+      ["0-1", "3-4"], // 2 left
+      ["6-6", "5-5", "2-2"], // the opener, stuck on 3
+      ["1-1", "4-4"], // 2 left
+      ["3-3", "5-4"], // 2 left
+    ];
+    // The opener no longer has the fewest, so the lead passes. Three players
+    // are tied on two tiles, and it goes to whichever of them plays first in
+    // turn order from the opener — seat 2, not seat 0.
+    const mano = manoAt(hands, 1);
+    expect(mano).toBe(2);
+    expect(roleOf(2, mano)).toBe("mano");
+    // Roles are counted round from whoever holds the lead, so the player who
+    // opened now sits last — the pie, whose job is to make the new mano pass.
+    expect(roleOf(3, mano)).toBe("segunda");
+    expect(roleOf(0, mano)).toBe("tercera");
+    expect(roleOf(1, mano)).toBe("pie");
+
+    // At the start of a round nobody has played, so the opener leads.
+    const fresh: [string[], string[], string[], string[]] = [
+      ["a", "b", "c"],
+      ["a", "b", "c"],
+      ["a", "b", "c"],
+      ["a", "b", "c"],
+    ];
+    expect(manoAt(fresh, 2)).toBe(2);
+  });
+
+  it("judges each move by the role held at the time", () => {
+    // You open (mano), then pass, then play again — by which point the lead has
+    // moved to someone else and your duties have changed.
+    const history: MoveRecord[] = [
+      {
+        seat: 0,
+        kind: "play",
+        move: { tileId: "6-6", end: "right" },
+        before: snap({
+          // Level pegging, so the opener leads.
+          hands: [
+            ["6-6", "0-1", "5-2"],
+            ["6-5", "2-2", "1-3"],
+            ["6-4", "3-3", "1-4"],
+            ["6-3", "4-4", "2-5"],
+          ],
+        }),
+      },
+      {
+        seat: 0,
+        kind: "play",
+        move: { tileId: "0-1", end: "right" },
+        before: snap({
+          // Everyone else is down to one tile; you are no longer ahead, so the
+          // lead has gone to the next player round from the opener.
+          hands: [["0-1", "5-2"], ["2-2"], ["3-3"], ["4-4"]],
+          line: [
+            { left: 6, right: 6, seat: 0, opening: true },
+            { left: 6, right: 1, seat: 1 },
+          ],
+          leftEnd: 6,
+          rightEnd: 1,
+        }),
+      },
+    ];
+    const review = reviewRound(history, 0);
+    expect(review.role).toBe("mano"); // where you started
+    const notes = review.moves[1].principles.map((n) => n.text).join(" ");
+    expect(notes).toMatch(/lead has/i); // and it tells you it moved
+  });
+
+  it("does not score team play for the mano, who plays their own hand", () => {
+    const history: MoveRecord[] = [
+      {
+        seat: 0,
+        kind: "play",
+        move: { tileId: "6-6", end: "right" },
+        // Everyone still holds the same number of tiles, so the opener leads.
+        before: snap({
+          hands: [
+            ["6-6", "5-4"],
+            ["1-1", "2-2"],
+            ["3-3", "4-4"],
+            ["5-5", "0-0"],
+          ],
+        }),
+      },
+    ];
+    const review = reviewRound(history, 0);
+    expect(review.role).toBe("mano");
+    expect(review.teamPlay).toBeNull();
+    expect(review.summary).toMatch(/own hand/i);
+  });
+
+  it("never calls a move the engine would also play an inaccuracy", () => {
+    for (const seed of [81, 82, 83, 84, 85, 86]) {
+      const s = playRound(newMatch(seededRng(seed)));
+      for (const m of reviewRound(s.history, 0).moves) {
+        if (m.engine?.agrees) {
+          expect(["great", "good"]).toContain(m.verdict);
+        }
+      }
+    }
+  });
+
   it("credits squeezing an opponent who has passed on that suit", () => {
     const history: MoveRecord[] = [
       {
@@ -304,13 +469,22 @@ describe("reviewRound", () => {
         kind: "play",
         move: { tileId: "5-5", end: "right" },
         before: snap({
-          hands: [["5-5", "5-1", "3-3", "3-2", "0-1", "2-6", "4-6"], [], [], []],
+          // A real deal: seven tiles each, so the opener holds the lead.
+          hands: [
+            ["5-5", "5-1", "3-3", "3-2", "0-1", "2-6", "4-6"],
+            ["6-6", "6-5", "6-3", "6-1", "6-0", "4-4", "4-3"],
+            ["2-2", "2-1", "2-0", "1-1", "1-0", "0-0", "5-4"],
+            ["4-2", "4-1", "4-0", "3-1", "3-0", "5-3", "5-2"],
+          ],
         }),
       },
     ];
     const review = reviewRound(history, 0);
-    expect(review.moves[0].principles[0].kind).toBe("plus");
-    expect(review.moves[0].principles[0].text).toMatch(/regla de oro/i);
+    const goldenRule = review.moves[0].principles.find((n) =>
+      /regla de oro/i.test(n.text)
+    );
+    expect(goldenRule).toBeDefined();
+    expect(goldenRule!.kind).toBe("plus");
   });
 
   it("provides an engine opinion whenever there was a real choice", () => {

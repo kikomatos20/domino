@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { End, Seat, TileId } from "@/engine/types";
 import type { PlayerView } from "@/server/types";
 import Board from "./Board";
 import type { EndAnchors } from "./Board";
 import DominoTile from "./DominoTile";
+import FeedbackButton from "./FeedbackButton";
 import PlayableHand from "./PlayableHand";
 import ReviewPanel from "./ReviewPanel";
 import { useFading, useReplay } from "./useReplay";
@@ -47,6 +48,13 @@ export default function OnlineTable({
   const replay = useReplay(game.line, game.lastAction);
   const myTurn =
     game.currentSeat === you && !game.roundOver && !game.matchOver && !replay.catchingUp;
+
+  // Being stuck is not a decision — take the turn automatically and say so.
+  useEffect(() => {
+    if (!myTurn || !game.mustPass || busy) return;
+    const t = setTimeout(onPass, 1400);
+    return () => clearTimeout(t);
+  }, [myTurn, game.mustPass, busy, onPass]);
 
   // Your team is the one you sit on: seats 0 & 2 against 1 & 3.
   const yourTeam = you % 2;
@@ -120,9 +128,7 @@ export default function OnlineTable({
           <div className="turn-hint">Your turn — drag a tile onto an end</div>
         )}
         {myTurn && game.mustPass && (
-          <button className="pass-button" disabled={busy} onClick={onPass}>
-            No playable tiles — Pass
-          </button>
+          <div className="skipped-note">Nothing you can play — skipping your turn</div>
         )}
         <PlayableHand
           tiles={game.hand}
@@ -183,6 +189,23 @@ export default function OnlineTable({
       {reviewing && (
         <ReviewPanel history={game.history} seat={you} onClose={() => setReviewing(false)} />
       )}
+
+      <FeedbackButton
+        context={() => ({
+          kind: "general",
+          mode: "online",
+          roomCode: view.code,
+          about: `Round ${game.roundNumber}, ${view.seats[you].nickname ?? "you"} in seat ${you}`,
+          payload: {
+            line: game.line,
+            ends: [game.leftEnd, game.rightEnd],
+            hand: game.hand,
+            currentSeat: game.currentSeat,
+            matchScore: game.matchScore,
+            seats: view.seats,
+          },
+        })}
+      />
     </main>
   );
 }

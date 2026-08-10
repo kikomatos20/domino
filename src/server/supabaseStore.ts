@@ -49,8 +49,46 @@ interface PlayerRow {
   last_seen: string;
 }
 
-export function createSupabaseStore(): RoomStore {
+/** Rows written to the feedback table. */
+export interface FeedbackRow {
+  kind: string;
+  message: string;
+  rating: number | null;
+  nickname: string | null;
+  room_code: string | null;
+  mode: string | null;
+  context: unknown;
+  app_version: string;
+}
+
+export function createSupabaseStore(): RoomStore & {
+  insertFeedback(row: FeedbackRow): Promise<{ error: unknown }>;
+  listFeedback(openOnly: boolean): Promise<unknown[]>;
+  resolveFeedback(id: string, resolved: boolean): Promise<void>;
+} {
   return {
+    async insertFeedback(row) {
+      const { error } = await admin().from("feedback").insert(row);
+      return { error };
+    },
+
+    async listFeedback(openOnly) {
+      let query = admin()
+        .from("feedback")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (openOnly) query = query.eq("resolved", false);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data ?? [];
+    },
+
+    async resolveFeedback(id, resolved) {
+      const { error } = await admin().from("feedback").update({ resolved }).eq("id", id);
+      if (error) throw error;
+    },
+
     async get(code) {
       const db = admin();
       const { data: room, error } = await db

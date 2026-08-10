@@ -8,8 +8,8 @@ import type { LastAction, PlacedTile } from "@/engine/types";
  * enough for the placement animation to land, but shortened when several tiles
  * are waiting — nobody wants to sit through four slow replays before their turn.
  */
-const STEP_MS = 1000;
-const HURRIED_STEP_MS = 520;
+const STEP_MS = 1400;
+const HURRIED_STEP_MS = 800;
 
 interface Replay {
   line: PlacedTile[];

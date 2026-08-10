@@ -27,8 +27,8 @@ import {
   teamOf,
   tilePips,
 } from "./engine";
-import { exposedEnd, readTable, scoreMoves } from "./ai";
-import type { End, Move, MoveRecord, PlacedTile, Seat, TileId } from "./types";
+import { exposedEnd, readTable, resultingEnds, scoreMoves } from "./ai";
+import type { End, GameState, Move, MoveRecord, PlacedTile, Seat, TileId } from "./types";
 
 /** Total pips in a double-six set — the basis of El Tigre's close arithmetic. */
 const TOTAL_PIPS = 168;
@@ -92,6 +92,14 @@ const ROLE_TITLE: Record<Role, string> = {
   pie: "Pie (last to play)",
 };
 
+/** Whose lead it is, from the point of view of someone in each role. */
+const SEAT_ROLE_OWNER: Record<Role, string> = {
+  mano: "you",
+  segunda: "the player on your right",
+  tercera: "your partner",
+  pie: "the player on your left",
+};
+
 /** El papel de los jugadores — what each seat is trying to achieve. */
 const ROLE_ADVICE: Record<Role, string> = {
   mano: "You opened, so the round is yours to dominate — play for your own hand. Keep a spread of suits so you never have to pass and hand the lead away.",
@@ -104,9 +112,43 @@ function nextSeat(seat: Seat): Seat {
   return ((seat + 1) % 4) as Seat;
 }
 
-export function roleOf(seat: Seat, opener: Seat): Role {
-  const offset = (seat - opener + 4) % 4;
+/**
+ * What a move actually does to the table.
+ *
+ * When both ends show the same suit, playing left or right leaves an identical
+ * position — it is one decision, not two, and grading the side you happened to
+ * pick would be nonsense. Moves are compared by the position they produce.
+ */
+function outcomeKey(state: GameState, move: Move): string {
+  const [l, r] = resultingEnds(state, move);
+  return `${Math.min(l, r)}-${Math.max(l, r)}`;
+}
+
+function distinctOutcomes(state: GameState, moves: Move[]): number {
+  return new Set(moves.map((m) => outcomeKey(state, m))).size;
+}
+
+export function roleOf(seat: Seat, mano: Seat): Role {
+  const offset = (seat - mano + 4) % 4;
   return offset === 0 ? "mano" : offset === 1 ? "segunda" : offset === 2 ? "tercera" : "pie";
+}
+
+/**
+ * Who holds the lead right now.
+ *
+ * The mano is not fixed for the round. El Tigre is explicit that the roles move
+ * as players pass — the lead belongs to whoever has the fewest tiles left, and
+ * on equal counts to whoever plays first. So a mano who passes hands the lead
+ * to the next player, and everyone's job changes with it.
+ */
+export function manoAt(hands: readonly string[][], opener: Seat): Seat {
+  const counts = hands.map((h) => h.length);
+  const fewest = Math.min(...counts);
+  for (let i = 0; i < 4; i++) {
+    const seat = ((opener + i) % 4) as Seat;
+    if (counts[seat] === fewest) return seat;
+  }
+  return opener;
 }
 
 function pipsOnTable(line: PlacedTile[]): number {
@@ -158,6 +200,7 @@ function closeMath(
 /** Review every decision `seat` made during a round. */
 export function reviewRound(history: MoveRecord[], seat: Seat): RoundReview {
   const opener = history.find((r) => r.kind === "play")?.seat ?? seat;
+  // The role you start the round with. It can change hands as people pass.
   const role = roleOf(seat, opener);
   const partner = ((seat + 2) % 4) as Seat;
   const opponents: Seat[] = [nextSeat(seat), ((seat + 3) % 4) as Seat];
@@ -167,6 +210,7 @@ export function reviewRound(history: MoveRecord[], seat: Seat): RoundReview {
   let number = 0;
   let teamGood = 0;
   let teamBad = 0;
+  let sawRoleShift = false;
 
   for (const rec of history) {
     if (rec.seat !== seat) continue;
@@ -189,11 +233,18 @@ export function reviewRound(history: MoveRecord[], seat: Seat): RoundReview {
     const closedBy = opening ? null : applyMove(state, seat, played).roundOver;
     const closesRound = !!closedBy && closedBy.kind !== "domino";
 
+    // Who leads at this moment, and therefore what your job is right now.
+    const mano = manoAt(rec.before.hands, opener);
+    const roleNow = roleOf(seat, mano);
+
     const principles: Note[] = [];
     let credit = 0;
+    // The mano plays their own hand, so team duties are not scored in that seat.
+    const scoresTeam = roleNow !== "mano";
     const team = (n: Note, delta: number) => {
       principles.push({ ...n, team: true });
       credit += delta;
+      if (!scoresTeam) return;
       if (delta > 0) teamGood++;
       else if (delta < 0) teamBad++;
     };
@@ -201,6 +252,23 @@ export function reviewRound(history: MoveRecord[], seat: Seat): RoundReview {
       principles.push(n);
       credit += delta;
     };
+
+    // Say so when the lead has moved — your duties moved with it. Kept aside so
+    // it survives even on a forced move, where the rest of the notes are
+    // cleared: whose lead it is stays worth knowing.
+    let roleNote: Note | null = null;
+    if (roleNow !== role) {
+      sawRoleShift = true;
+      roleNote = {
+        kind: "info",
+        team: true,
+        text:
+          roleNow === "mano"
+            ? `The lead has come to you — you hold the fewest tiles, so you are the mano now and play your own hand.`
+            : `The lead has moved to ${SEAT_ROLE_OWNER[roleNow]}; you are the ${roleNow} for this move.`,
+      };
+      principles.push(roleNote);
+    }
 
     if (opening) {
       judgeOpening(played.tileId, hand, k, solo, (n, d) => team(n, d));
@@ -245,17 +313,49 @@ export function reviewRound(history: MoveRecord[], seat: Seat): RoundReview {
           partnerVoids.has(endBefore) && partnerVoids.has(otherEnd);
         const partnerStuckAfter = partnerVoids.has(exposed) && partnerVoids.has(otherEnd);
 
+        // Do you own this suit? If none of it is unaccounted for, nobody else
+        // can answer that end — opening it is a squeeze you have set up, not a
+        // gift, and none of the usual warnings apply.
+        const unseenOfSuit = k.unseenSuit[exposed];
+        const youControl = unseenOfSuit === 0;
+        const youDominate = k.suitCount[exposed] > unseenOfSuit;
+
+        if (youControl && changedTheSuit) {
+          solo(
+            {
+              kind: "plus",
+              text: `Every remaining ${exposed} is in your hand, so that end is yours alone — nobody else can answer it.`,
+            },
+            2
+          );
+        } else if (youDominate && changedTheSuit) {
+          principles.push({
+            kind: "info",
+            text: `You hold more ${exposed}s (${k.suitCount[exposed]}) than are unaccounted for (${unseenOfSuit}), so you keep the upper hand on that end.`,
+          });
+        }
+
         // --- your partner ---
         // Your partner only needs one end. Shutting them out means closing the
         // last door they had, not merely leaving a suit they cannot use.
-        if (partnerStuckAfter && !partnerStuckBefore) {
-          team(
-            {
-              kind: "minus",
-              text: `That closed the last end your partner could use — both ${exposed}s and ${otherEnd}s are suits they have passed on, so they must pass again. You are playing fourteen tiles, not seven.`,
-            },
-            -2
-          );
+        if (partnerStuckAfter && !partnerStuckBefore && !youControl) {
+          if (roleNow === "mano") {
+            // The mano plays their own game first — El Tigre is explicit about
+            // it — so this is worth knowing, not a fault.
+            principles.push({
+              kind: "info",
+              team: true,
+              text: `This leaves your partner stuck on both ends. As the mano you play your own hand first, so that can be the right price — just know you are paying it.`,
+            });
+          } else {
+            team(
+              {
+                kind: "minus",
+                text: `That closed the last end your partner could use — both ${exposed}s and ${otherEnd}s are suits they have passed on, so they must pass again. You are playing fourteen tiles, not seven.`,
+              },
+              -2
+            );
+          }
         } else if (partnerVoids.has(exposed) && !partnerStuckAfter) {
           principles.push({
             kind: "info",
@@ -281,8 +381,8 @@ export function reviewRound(history: MoveRecord[], seat: Seat): RoundReview {
           );
         }
 
-        if (role === "tercera") {
-          const openerSuits = suitsPlayedBy(rec.before.line, opener);
+        if (roleNow === "tercera" && !youControl) {
+          const openerSuits = suitsPlayedBy(rec.before.line, mano);
           const couldRepeat = options.some((m) => {
             const t = parseTile(m.tileId);
             return openerSuits.has(t.a) || openerSuits.has(t.b);
@@ -324,8 +424,15 @@ export function reviewRound(history: MoveRecord[], seat: Seat): RoundReview {
         const rightOpponent = opponents[0];
         const theirSuits = suitsPlayedBy(rec.before.line, rightOpponent, 2);
         // Only a tile that changes the suit can hand them anything; a double
-        // leaves the end exactly as it already was.
-        if (changedTheSuit && theirSuits.has(exposed) && !k.voids[rightOpponent].has(exposed)) {
+        // leaves the end exactly as it already was. And a suit you control is
+        // not a gift to anyone.
+        if (
+          changedTheSuit &&
+          !youControl &&
+          !youDominate &&
+          theirSuits.has(exposed) &&
+          !k.voids[rightOpponent].has(exposed)
+        ) {
           team(
             {
               kind: "minus",
@@ -381,14 +488,23 @@ export function reviewRound(history: MoveRecord[], seat: Seat): RoundReview {
       );
     }
 
-    // Lens 2: the engine's own ranking of the same position.
+    // Lens 2: the engine's own ranking — of positions, not of which side of the
+    // table you happened to drop the tile on.
+    const outcomes = distinctOutcomes(state, options);
     let engine: MoveReview["engine"] = null;
-    if (options.length > 1) {
-      const ranked = scoreMoves(state, seat, { difficulty: "hard", deterministic: true });
+    if (outcomes > 1) {
+      const scored = scoreMoves(state, seat, { difficulty: "hard", deterministic: true });
+      // Collapse moves that leave the same position, keeping the best score.
+      const byOutcome = new Map<string, (typeof scored)[number]>();
+      for (const entry of scored) {
+        const key = outcomeKey(state, entry.move);
+        const seen = byOutcome.get(key);
+        if (!seen || entry.score > seen.score) byOutcome.set(key, entry);
+      }
+      const ranked = [...byOutcome.values()].sort((x, y) => y.score - x.score);
       const best = ranked[0];
-      const mineIdx = ranked.findIndex(
-        (r) => r.move.tileId === played.tileId && r.move.end === played.end
-      );
+      const myKey = outcomeKey(state, played);
+      const mineIdx = ranked.findIndex((r) => outcomeKey(state, r.move) === myKey);
       const mine = ranked[mineIdx];
       engine = {
         agrees: mineIdx === 0,
@@ -403,14 +519,25 @@ export function reviewRound(history: MoveRecord[], seat: Seat): RoundReview {
 
     let verdict: Verdict;
     if (credit >= 2) verdict = "great";
-    else if (credit >= 0) verdict = "good";
-    else if (credit === -1) verdict = "inaccuracy";
+    else if (credit >= -1) verdict = "good";
+    else if (credit === -2) verdict = "inaccuracy";
     else verdict = "mistake";
 
-    if (options.length === 1) {
+    // If the engine would have played it too, it is not an error. This stops a
+    // single soft principle from branding a perfectly good move.
+    if (engine?.agrees && verdict !== "great") verdict = "good";
+
+    if (outcomes === 1) {
       verdict = "good";
       principles.length = 0;
-      principles.push({ kind: "info", text: "Only one legal move — nothing to decide." });
+      if (roleNote) principles.push(roleNote);
+      principles.push({
+        kind: "info",
+        text:
+          options.length === 1
+            ? "Only one legal move — nothing to decide."
+            : "Both ends were the same, so either side left the identical position — nothing to decide.",
+      });
     }
 
     moves.push({
@@ -421,7 +548,8 @@ export function reviewRound(history: MoveRecord[], seat: Seat): RoundReview {
         rec.before.leftEnd === null || rec.before.rightEnd === null
           ? null
           : [rec.before.leftEnd, rec.before.rightEnd],
-      choices: options.length,
+      // Real decisions, not legal moves: two ends showing the same suit are one.
+      choices: outcomes,
       verdict,
       headline: headlineFor(verdict, played.tileId),
       principles,
@@ -436,19 +564,26 @@ export function reviewRound(history: MoveRecord[], seat: Seat): RoundReview {
         (decided.reduce((s, m) => s + VERDICT_RANK[m.verdict], 0) / (decided.length * 3)) * 100
       )
     : 100;
+  // Moves made while holding the lead are excluded above, so if nothing is left
+  // to score, this player was the mano throughout and there is no team score to
+  // give — reporting one would nag them for doing the right thing.
   const teamTotal = teamGood + teamBad;
   const teamPlay = teamTotal ? Math.round((teamGood / teamTotal) * 100) : null;
 
   return {
     role,
     roleTitle: ROLE_TITLE[role],
-    roleAdvice: ROLE_ADVICE[role],
+    roleAdvice:
+      ROLE_ADVICE[role] +
+      (sawRoleShift
+        ? " The lead changed hands during the round, so your job changed with it — each move below is judged by the role you held at the time."
+        : ""),
     moves,
     passes,
     engineAgreement,
     accuracy,
     teamPlay,
-    summary: summarize(moves, decided.length, engineAgreement, accuracy, passes, teamPlay),
+    summary: summarize(moves, decided.length, engineAgreement, accuracy, passes, teamPlay, role),
   };
 }
 
@@ -628,7 +763,8 @@ function summarize(
   agreement: number,
   accuracy: number,
   passes: number,
-  teamPlay: number | null
+  teamPlay: number | null,
+  role: Role
 ): string {
   if (moves.length === 0) return "You never got to place a tile this round.";
 
@@ -645,7 +781,11 @@ function summarize(
     parts.push(`${bits.join(" and ")} out of ${moves.length} plays.`);
   }
   if (teamPlay !== null) {
-    parts.push(`Team play ${teamPlay}% — that is how often your choices helped your side rather than the opponents.`);
+    parts.push(
+      `Team play ${teamPlay}% — that is how often your choices helped your side rather than the opponents.`
+    );
+  } else if (role === "mano") {
+    parts.push("You held the lead, so you were playing your own hand — no team score this round.");
   }
   if (decided > 0) {
     parts.push(`You matched the engine's first choice ${agreement} of ${decided} times.`);

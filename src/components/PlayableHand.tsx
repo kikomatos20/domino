@@ -70,9 +70,17 @@ export default function PlayableHand({
     [active, movesFor]
   );
 
-  /** Which end, if any, the pointer is currently over. */
+  /**
+   * Which end the pointer is over.
+   *
+   * When a tile only fits one end there is nothing to choose, so dropping it
+   * anywhere plays it there — no need to hunt for the target.
+   */
   const endUnder = useCallback(
     (x: number, y: number): End | null => {
+      const only = [...activeEnds];
+      if (only.length === 1) return only[0];
+
       let best: End | null = null;
       let bestDistance = DROP_RADIUS;
       for (const end of ["left", "right"] as End[]) {

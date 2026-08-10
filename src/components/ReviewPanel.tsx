@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { reviewRound } from "@/engine/review";
 import type { MoveReview, Verdict } from "@/engine/review";
 import type { MoveRecord, Seat } from "@/engine/types";
+import FeedbackForm from "./FeedbackForm";
+import type { FeedbackContext } from "./FeedbackForm";
 
 const VERDICT_LABEL: Record<Verdict, string> = {
   great: "Strong",
@@ -23,6 +25,13 @@ export default function ReviewPanel({
 }) {
   const review = useMemo(() => reviewRound(history, seat), [history, seat]);
   const [lens, setLens] = useState<"principles" | "engine">("principles");
+  const [disputing, setDisputing] = useState<FeedbackContext | null>(null);
+
+  /** The position this verdict was about, so it can be replayed exactly. */
+  const positionFor = (moveNumber: number) => {
+    const plays = history.filter((r) => r.seat === seat && r.kind === "play");
+    return plays[moveNumber - 1] ?? null;
+  };
 
   return (
     <div className="overlay" onClick={onClose}>
@@ -65,15 +74,50 @@ export default function ReviewPanel({
             <p className="review-empty">You didn&apos;t place a tile this round.</p>
           )}
           {review.moves.map((m) => (
-            <MoveCard key={m.number} m={m} lens={lens} />
+            <MoveCard
+              key={m.number}
+              m={m}
+              lens={lens}
+              onDispute={() =>
+                setDisputing({
+                  kind: "review",
+                  about: `Move ${m.number}: ${m.headline}`,
+                  payload: {
+                    verdict: m.verdict,
+                    tileId: m.tileId,
+                    end: m.end,
+                    endsBefore: m.endsBefore,
+                    choices: m.choices,
+                    principles: m.principles,
+                    engine: m.engine,
+                    role: review.role,
+                    seat,
+                    // The whole position, so the hand can be rebuilt in a test.
+                    position: positionFor(m.number),
+                  },
+                })
+              }
+            />
           ))}
         </div>
       </div>
+
+      {disputing && (
+        <FeedbackForm context={disputing} onClose={() => setDisputing(null)} />
+      )}
     </div>
   );
 }
 
-function MoveCard({ m, lens }: { m: MoveReview; lens: "principles" | "engine" }) {
+function MoveCard({
+  m,
+  lens,
+  onDispute,
+}: {
+  m: MoveReview;
+  lens: "principles" | "engine";
+  onDispute: () => void;
+}) {
   return (
     <article className={`move-card ${m.verdict}`}>
       <div className="move-head">
@@ -124,6 +168,10 @@ function MoveCard({ m, lens }: { m: MoveReview; lens: "principles" | "engine" })
       ) : (
         <p className="engine-verdict agree">Forced move — nothing to compare.</p>
       )}
+
+      <button className="dispute" onClick={onDispute}>
+        This verdict looks wrong
+      </button>
     </article>
   );
 }
