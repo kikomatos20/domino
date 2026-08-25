@@ -33,6 +33,7 @@ export default function Lobby({
   busy: boolean;
 }) {
   const [copied, setCopied] = useState(false);
+  const [chatOpen, setChatOpen] = useState(true);
   const isHost = view.you?.isHost ?? false;
   const humans = view.seats.filter((s) => s.nickname).length;
 
@@ -47,7 +48,8 @@ export default function Lobby({
   };
 
   return (
-    <main className="home">
+    <main className="home lobby-page">
+      <div className="lobby-stack">
       <div className="home-card lobby">
         <h1>Table {view.code}</h1>
         <p className="home-sub">
@@ -126,8 +128,16 @@ export default function Lobby({
       </div>
 
       {view.you && (
-        <TableChat chat={view.chat ?? []} you={view.you.seat} onSend={onChat} busy={busy} />
+        <TableChat
+          chat={view.chat ?? []}
+          you={view.you.seat}
+          onSend={onChat}
+          open={chatOpen}
+          onToggle={() => setChatOpen((o) => !o)}
+          busy={busy}
+        />
       )}
+      </div>
     </main>
   );
 }

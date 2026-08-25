@@ -40,6 +40,8 @@ export default function OnlineTable({
   error: string | null;
 }) {
   const [reviewing, setReviewing] = useState(false);
+  // Open by default — half the point of table talk is seeing it arrive.
+  const [chatOpen, setChatOpen] = useState(true);
   const [ends, setEnds] = useState<EndAnchors>({ left: null, right: null });
 
   const game = view.game!;
@@ -77,7 +79,7 @@ export default function OnlineTable({
     : null;
 
   return (
-    <main className="table-root">
+    <main className={`table-root ${chatOpen ? "" : "chat-hidden"}`}>
       <header className="scoreboard">
         <div className="score us">
           <span className="label">Us</span>
@@ -204,7 +206,14 @@ export default function OnlineTable({
         />
       )}
 
-      <TableChat chat={view.chat ?? []} you={you} onSend={onChat} busy={busy} />
+      <TableChat
+        chat={view.chat ?? []}
+        you={you}
+        onSend={onChat}
+        open={chatOpen}
+        onToggle={() => setChatOpen((o) => !o)}
+        busy={busy}
+      />
 
       <FeedbackButton
         context={() => ({

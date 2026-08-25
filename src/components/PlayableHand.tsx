@@ -6,7 +6,7 @@ import type { End, Move, TileId } from "@/engine/types";
 import DominoTile from "./DominoTile";
 import ZoomedTile, { HOLD_MS } from "./ZoomedTile";
 import type { EndAnchors } from "./Board";
-import { resolveDrop } from "./dropTarget";
+import { resolveDrop, type Rect } from "./dropTarget";
 
 /** Movement before a press becomes a drag rather than a tap. */
 const DRAG_THRESHOLD = 6;
@@ -73,8 +73,23 @@ export default function PlayableHand({
 
   /** Which end the pointer is over, or null if letting go would cancel. */
   const endUnder = useCallback(
-    (x: number, y: number): End | null =>
-      resolveDrop(x, y, activeEnds, ends, handRef.current?.getBoundingClientRect() ?? null),
+    (x: number, y: number): End | null => {
+      const hand = handRef.current?.getBoundingClientRect();
+      // Everything from the top of your hand down is yours: the hand itself and
+      // whatever sits below it, such as the chat on a narrow screen.
+      const handZone = hand
+        ? {
+            left: 0,
+            right: window.innerWidth,
+            top: hand.top,
+            bottom: Number.POSITIVE_INFINITY,
+          }
+        : null;
+      const dock = document
+        .querySelector(".chat-dock")
+        ?.getBoundingClientRect() as Rect | undefined;
+      return resolveDrop(x, y, activeEnds, ends, [handZone, dock ?? null]);
+    },
     [activeEnds, ends]
   );
 

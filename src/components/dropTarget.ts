@@ -22,9 +22,10 @@ export function inside(rect: Rect | null, x: number, y: number): boolean {
  *
  * Two rules, in order:
  *
- * 1. Over your own hand is always a cancel. Dragging a tile back is how people
- *    change their mind, and it has to be reliable even when the tile fits only
- *    one end — otherwise second-guessing yourself plays the tile.
+ * 1. Anything that is not the table — your hand, the chat — is a cancel.
+ *    Dragging a tile back is how people change their mind, and it has to be
+ *    reliable even when the tile fits only one end, otherwise second-guessing
+ *    yourself plays the tile.
  * 2. Anywhere else, a tile with only one legal end goes there without you having
  *    to hit the target. Hunting for a small anchor on a phone is no fun, and
  *    with one option there is nothing to disambiguate.
@@ -34,9 +35,9 @@ export function resolveDrop(
   y: number,
   activeEnds: ReadonlySet<End>,
   ends: EndAnchors,
-  handRect: Rect | null
+  cancelZones: readonly (Rect | null)[]
 ): End | null {
-  if (inside(handRect, x, y)) return null;
+  if (cancelZones.some((zone) => inside(zone, x, y))) return null;
 
   const only = [...activeEnds];
   if (only.length === 1) return only[0];

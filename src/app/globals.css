@@ -24,18 +24,25 @@ body {
   color: #fff;
 }
 
+/* The chat is a column of the table, not a thing on top of it: opening it
+   narrows the board rather than hiding part of it. */
 .table-root {
   display: grid;
   grid-template-areas:
-    "score score score"
-    "west north east"
-    "west board east"
-    "hand hand hand";
+    "score score score chat"
+    "west north east chat"
+    "west board east chat"
+    "hand hand hand chat";
   grid-template-rows: auto auto 1fr auto;
-  grid-template-columns: 90px 1fr 90px;
+  grid-template-columns: 90px 1fr 90px 290px;
   height: 100dvh;
   padding: 8px;
   gap: 6px;
+}
+
+/* Closed: the column collapses and the board takes the space back. */
+.table-root.chat-hidden {
+  grid-template-columns: 90px 1fr 90px 0;
 }
 
 .table-root.loading {
@@ -287,6 +294,20 @@ body {
 
 /* ---------- table chat ---------- */
 
+/* In the lobby the chat sits under the card rather than beside it. */
+.lobby-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  width: 100%;
+  max-width: 440px;
+}
+
+.lobby-stack .chat-dock {
+  height: 220px;
+}
+
 /* Sits beside the feedback button, out of the way of the hand. */
 .chat-toggle {
   position: fixed;
@@ -322,19 +343,47 @@ body {
   text-align: center;
 }
 
-.chat-panel {
-  position: fixed;
-  left: 10px;
-  bottom: 46px;
-  z-index: 120;
-  width: min(300px, calc(100vw - 20px));
-  max-height: min(46vh, 340px);
+.chat-dock {
+  grid-area: chat;
   display: flex;
   flex-direction: column;
-  background: rgba(12, 14, 18, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  min-height: 0;
+  min-width: 0;
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 12px;
   overflow: hidden;
+}
+
+.chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.chat-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+}
+
+.chat-collapse {
+  background: none;
+  border: none;
+  color: #fff;
+  opacity: 0.65;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.chat-collapse:hover {
+  opacity: 1;
 }
 
 .chat-log {
@@ -1497,10 +1546,31 @@ body {
 @media (max-width: 640px) {
   /* Give the table as much width as possible — the side seats only need to show
      how many tiles are left. */
+  /* No room for a side column on a phone — the chat becomes a short row under
+     your hand, so it still never covers the table. */
   .table-root {
+    grid-template-areas:
+      "score score score"
+      "west north east"
+      "west board east"
+      "hand hand hand"
+      "chat chat chat";
+    grid-template-rows: auto auto 1fr auto auto;
     grid-template-columns: 34px 1fr 34px;
     gap: 2px;
     padding: 4px;
+  }
+
+  .table-root.chat-hidden {
+    grid-template-columns: 34px 1fr 34px;
+  }
+
+  .chat-dock {
+    height: 122px;
+  }
+
+  .lobby-stack .chat-dock {
+    height: 180px;
   }
 
   .tile.vertical {
