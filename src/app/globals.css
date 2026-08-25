@@ -285,6 +285,133 @@ body {
   opacity: 0.85;
 }
 
+/* ---------- table chat ---------- */
+
+/* Sits beside the feedback button, out of the way of the hand. */
+.chat-toggle {
+  position: fixed;
+  left: 10px;
+  bottom: 10px;
+  z-index: 120;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #fff;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  opacity: 0.65;
+}
+
+.chat-toggle:hover,
+.chat-toggle.unread {
+  opacity: 1;
+}
+
+.chat-badge {
+  display: inline-block;
+  margin-left: 6px;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #d4af37;
+  color: #1a1a1a;
+  font-size: 0.68rem;
+  line-height: 16px;
+  text-align: center;
+}
+
+.chat-panel {
+  position: fixed;
+  left: 10px;
+  bottom: 46px;
+  z-index: 120;
+  width: min(300px, calc(100vw - 20px));
+  max-height: min(46vh, 340px);
+  display: flex;
+  flex-direction: column;
+  background: rgba(12, 14, 18, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.chat-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.chat-empty {
+  margin: 0;
+  opacity: 0.5;
+}
+
+.chat-who {
+  font-weight: 700;
+  margin-right: 5px;
+  color: #9fc7ff;
+}
+
+.chat-who.you {
+  color: #d4af37;
+}
+
+.chat-text {
+  overflow-wrap: anywhere;
+}
+
+/* The run of play is context, not conversation — quieter than chat. */
+.chat-move,
+.chat-event {
+  opacity: 0.55;
+  font-size: 0.72rem;
+}
+
+.chat-event {
+  font-style: italic;
+}
+
+.chat-input {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.chat-input input {
+  flex: 1;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  color: #fff;
+  padding: 6px 8px;
+  font-size: 0.8rem;
+}
+
+.chat-input button {
+  background: #d4af37;
+  border: none;
+  border-radius: 8px;
+  color: #1a1a1a;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.chat-input button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 /* ---------- feedback ---------- */
 
 .feedback-fab {

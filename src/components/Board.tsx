@@ -20,11 +20,14 @@ export default function Board({
   line,
   lastAction,
   onEnds,
+  viewer = 0,
 }: {
   line: PlacedTile[];
   lastAction: LastAction | null;
   /** Reports the screen position of both open ends whenever they move. */
   onEnds?: (ends: EndAnchors) => void;
+  /** Whose screen this is; the table turns so they sit at the bottom. */
+  viewer?: Seat;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
@@ -55,7 +58,10 @@ export default function Board({
   // whole thing to fit. Tile size is fixed for the entire round either way.
   const virtual = Math.max(MIN_TABLE, size);
   const scale = size / virtual;
-  const items = useMemo(() => layoutLine(line, virtual), [line, virtual]);
+  const items = useMemo(
+    () => layoutLine(line, virtual, undefined, viewer),
+    [line, virtual, viewer]
+  );
 
   const lastIdx =
     lastAction?.kind === "play"
@@ -64,12 +70,16 @@ export default function Board({
         : line.length - 1
       : null;
 
-  const FROM: Record<Seat, [string, string]> = {
-    0: ["0px", "150px"],
-    1: ["150px", "0px"],
-    2: ["0px", "-150px"],
-    3: ["-150px", "0px"],
+  // Where a tile flies in from, relative to the person looking: their own plays
+  // come up from the bottom, their partner's down from the top, opponents' in
+  // from the sides.
+  const FROM: Record<number, [string, string]> = {
+    0: ["0px", "220px"],
+    1: ["220px", "0px"],
+    2: ["0px", "-220px"],
+    3: ["-220px", "0px"],
   };
+  const fromFor = (seat: Seat) => FROM[(seat - viewer + 4) % 4];
 
   // Tell the hand where the two ends are, in screen coordinates, so a dragged
   // tile can be dropped onto one of them. Recomputed whenever the chain or the
@@ -129,7 +139,7 @@ export default function Board({
       >
         {items.map(({ p, idx, vertical, reversed, x, y }) => {
           const lastPlayed = idx === lastIdx;
-          const [fx, fy] = FROM[p.seat];
+          const [fx, fy] = fromFor(p.seat);
           const l = reversed ? p.right : p.left;
           const r = reversed ? p.left : p.right;
           return (

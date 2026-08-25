@@ -16,7 +16,7 @@ export function createMemoryStore(): RoomStore & { clear(): void } {
       return room ? clone(room) : null;
     },
     async put(room) {
-      rooms.set(room.code, clone(room));
+      rooms.set(room.code, clone({ ...room, chat: room.chat ?? [] }));
     },
     async create(room) {
       if (rooms.has(room.code)) throw new Error(`Room ${room.code} already exists`);

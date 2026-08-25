@@ -18,9 +18,9 @@ import {
 } from "@/engine/engine";
 import { chooseMove } from "@/engine/ai";
 import type { Difficulty } from "@/engine/ai";
-import type { GameState, Move, Seat } from "@/engine/types";
+import type { GameState, Move, Seat, TileId } from "@/engine/types";
 import { RoomError } from "./types";
-import type { Player, PlayerView, Room, RoomStore } from "./types";
+import type { ChatEntry, Player, PlayerView, Room, RoomStore } from "./types";
 
 const SEATS: Seat[] = [0, 1, 2, 3];
 /** No I, O, 0 or 1 — they get misread when people share a code out loud. */
@@ -44,6 +44,47 @@ export function makeToken(random: () => number = Math.random): string {
 
 function seatOf(room: Room, token: string): Player | null {
   return room.players.find((p) => p.token === token) ?? null;
+}
+
+/** Keep the tail of the conversation; nobody scrolls back further than this. */
+const CHAT_LIMIT = 120;
+const MAX_CHAT_LENGTH = 240;
+
+export function nameOf(room: Room, seat: Seat): string {
+  return room.players.find((p) => p.seat === seat)?.nickname ?? "Computer";
+}
+
+function say(
+  room: Room,
+  entry: { kind: ChatEntry["kind"]; seat: Seat | null; who: string; text: string }
+): void {
+  room.chat = [
+    ...(room.chat ?? []),
+    { ...entry, id: `${Date.now().toString(36)}-${room.chat?.length ?? 0}`, at: Date.now() },
+  ].slice(-CHAT_LIMIT);
+}
+
+/** "6-3" reads better as "6|3" in a sentence. */
+function tileText(id: TileId): string {
+  return id.replace("-", "|");
+}
+
+/** Note the result of a round once it lands. */
+function announceRoundEnd(room: Room, game: GameState): void {
+  const r = game.roundOver;
+  if (!r) return;
+  if (r.kind === "tie") {
+    say(room, { kind: "event", seat: null, who: "", text: "Blocked — dead tie, no score" });
+    return;
+  }
+  const winner = r.winnerSeat !== null ? nameOf(room, r.winnerSeat) : "Nobody";
+  const how = r.kind === "domino" ? `${winner} dominoed` : `Blocked — ${winner}'s side was lighter`;
+  say(room, {
+    kind: "event",
+    seat: r.winnerSeat,
+    who: "",
+    text: `${how}, ${r.points} point${r.points === 1 ? "" : "s"}`,
+  });
 }
 
 function requirePlayer(room: Room, token: string): Player {
@@ -91,9 +132,11 @@ export async function createRoom(
     target: opts.target ?? 100,
     hostToken: token,
     players: [{ seat: 0, nickname, token, connected: true, lastSeen: Date.now() }],
+    chat: [],
     version: 1,
     updatedAt: Date.now(),
   };
+  say(room, { kind: "event", seat: 0, who: "", text: `${nickname} opened the table` });
   await store.create(room);
   return { room, token };
 }
@@ -111,13 +154,15 @@ export async function joinRoom(
   if (open.length === 0) throw new RoomError("That room is full", 409);
 
   const token = makeToken(random);
+  const name = cleanNickname(nickname);
   room.players.push({
     seat: open[0],
-    nickname: cleanNickname(nickname),
+    nickname: name,
     token,
     connected: true,
     lastSeen: Date.now(),
   });
+  say(room, { kind: "event", seat: open[0], who: "", text: `${name} sat down` });
   await save(store, room);
   return { room, token };
 }
@@ -221,6 +266,12 @@ export async function startMatch(
 
   room.status = "playing";
   room.game = newMatch(Math.random, room.target);
+  say(room, {
+    kind: "event",
+    seat: null,
+    who: "",
+    text: `Match on — ${nameOf(room, room.game.opener)} opens with the double six`,
+  });
   await advanceAi(room);
   await save(store, room);
   return room;
@@ -245,6 +296,13 @@ export async function playMove(
   }
 
   room.game = applyMove(game, player.seat, move);
+  say(room, {
+    kind: "move",
+    seat: player.seat,
+    who: player.nickname,
+    text: `played ${tileText(move.tileId)}`,
+  });
+  announceRoundEnd(room, room.game);
   await advanceAi(room);
   await save(store, room);
   return room;
@@ -263,6 +321,8 @@ export async function playPass(
   if (!mustPass(game, player.seat)) throw new RoomError("You still have a legal move", 422);
 
   room.game = applyPass(game, player.seat);
+  say(room, { kind: "move", seat: player.seat, who: player.nickname, text: "passed" });
+  announceRoundEnd(room, room.game);
   await advanceAi(room);
   await save(store, room);
   return room;
@@ -281,7 +341,29 @@ export async function beginNextRound(
   if (game.matchOver) throw new RoomError("The match is over", 409);
 
   room.game = nextRound(game);
+  say(room, {
+    kind: "event",
+    seat: null,
+    who: "",
+    text: `Round ${room.game.roundNumber} — ${nameOf(room, room.game.opener)} opens`,
+  });
   await advanceAi(room);
+  await save(store, room);
+  return room;
+}
+
+/** A line of table talk from a seated player. */
+export async function postChat(
+  store: RoomStore,
+  code: string,
+  token: string,
+  text: string
+): Promise<Room> {
+  const room = await mustGet(store, code);
+  const player = requirePlayer(room, token);
+  const message = (text ?? "").trim().slice(0, MAX_CHAT_LENGTH);
+  if (!message) throw new RoomError("Nothing to say");
+  say(room, { kind: "chat", seat: player.seat, who: player.nickname, text: message });
   await save(store, room);
   return room;
 }
@@ -305,6 +387,13 @@ async function advanceAi(room: Room): Promise<void> {
 
     const move = chooseMove(game, seat, { difficulty: room.difficulty });
     game = move ? applyMove(game, seat, move) : applyPass(game, seat);
+    say(room, {
+      kind: "move",
+      seat,
+      who: nameOf(room, seat),
+      text: move ? `played ${tileText(move.tileId)}` : "passed",
+    });
+    announceRoundEnd(room, game);
   }
 
   room.game = game;
@@ -342,6 +431,7 @@ export function viewFor(room: Room, token: string | null): PlayerView {
     difficulty: room.difficulty,
     target: room.target,
     seats,
+    chat: room.chat ?? [],
     game:
       game && me
         ? {

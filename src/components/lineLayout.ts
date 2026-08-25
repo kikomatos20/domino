@@ -1,4 +1,4 @@
-import type { PlacedTile } from "@/engine/types";
+import type { PlacedTile, Seat } from "@/engine/types";
 
 /**
  * Board geometry for a square table.
@@ -48,9 +48,16 @@ const VEC: Record<Dir, [number, number]> = {
 /** Arms turn clockwise, so the chain spirals around the table. */
 const CW: Record<Dir, Dir> = { R: "D", D: "L", L: "U", U: "R" };
 
-/** The opening tile lies flat toward whoever opened, so you can see who went out. */
-export function openingIsVertical(open: PlacedTile): boolean {
-  return open.seat === 1 || open.seat === 3; // East/West read sideways
+/**
+ * The opening tile lies flat toward whoever opened, so you can see who went out.
+ *
+ * "Toward" is from the point of view of whoever is looking. Every player sits at
+ * the bottom of their own screen, so the table has to be turned to match: a tile
+ * laid flat for the player on your left must read sideways to you.
+ */
+export function openingIsVertical(open: PlacedTile, viewer: Seat = 0): boolean {
+  const relative = (open.seat - viewer + 4) % 4;
+  return relative === 1 || relative === 3; // sitting to your right or left
 }
 
 /**
@@ -61,9 +68,9 @@ export function openingIsVertical(open: PlacedTile): boolean {
  * So the chain always travels perpendicular to the tile that started it —
  * double or not.
  */
-export function lineAxis(line: PlacedTile[]): Axis {
+export function lineAxis(line: PlacedTile[], viewer: Seat = 0): Axis {
   const open = line.find((t) => t.opening) ?? line[0];
-  return openingIsVertical(open) ? "h" : "v";
+  return openingIsVertical(open, viewer) ? "h" : "v";
 }
 
 function isHorizontalTravel(dir: Dir): boolean {
@@ -242,20 +249,22 @@ function walk(
 export function layoutLine(
   line: PlacedTile[],
   size: number,
-  margin = 6
+  margin = 6,
+  /** Whose screen this is. The table turns so they always sit at the bottom. */
+  viewer: Seat = 0
 ): LaidTile[] {
   if (line.length === 0) return [];
 
   let oIdx = line.findIndex((t) => t.opening);
   if (oIdx === -1) oIdx = 0;
   const open = line[oIdx];
-  const oVert = openingIsVertical(open);
+  const oVert = openingIsVertical(open, viewer);
 
   const c = size / 2;
   const w = oVert ? TILE_SHORT : TILE_LONG;
   const h = oVert ? TILE_LONG : TILE_SHORT;
 
-  const axis = lineAxis(line);
+  const axis = lineAxis(line, viewer);
   // How wide the opening tile sits across the chain's lane.
   const fwdDir: Dir = axis === "h" ? "R" : "D";
 

@@ -7,6 +7,7 @@ import {
   leaveRoom,
   playMove,
   playPass,
+  postChat,
   startMatch,
   takeSeat,
   updateSettings,
@@ -324,6 +325,69 @@ describe("disconnections", () => {
 
     const after = await get(code);
     expect(after.game!.currentSeat).toBe(seat); // waits for them to return
+  });
+});
+
+describe("table chat", () => {
+  it("carries the run of play alongside what people say", async () => {
+    const { code, tokens } = await fourPlayers();
+    await startMatch(store, code, tokens[0]);
+    await playCurrent(code, tokens);
+
+    await postChat(store, code, tokens[1], "nice one");
+
+    const view = viewFor(await get(code), tokens[1]);
+    const kinds = view.chat.map((c) => c.kind);
+    expect(kinds).toContain("event"); // sat down, match on
+    expect(kinds).toContain("move"); // the tile that was just played
+    expect(view.chat.at(-1)).toMatchObject({ kind: "chat", text: "nice one", seat: 1 });
+
+    // Moves name the tile, so "nice one" still makes sense later.
+    const move = view.chat.find((c) => c.kind === "move")!;
+    expect(move.text).toMatch(/played \d\|\d/);
+  });
+
+  it("refuses empty messages and trims long ones", async () => {
+    const { code, tokens } = await fourPlayers();
+    const before = (await get(code)).chat.length;
+
+    await expect(postChat(store, code, tokens[0], "   ")).rejects.toBeInstanceOf(RoomError);
+    await postChat(store, code, tokens[0], "x".repeat(500));
+
+    const chat = (await get(code)).chat;
+    expect(chat.length).toBe(before + 1);
+    expect(chat.at(-1)!.text.length).toBeLessThanOrEqual(240);
+  });
+
+  it("does not let a stranger post to a room they are not in", async () => {
+    const { code } = await fourPlayers();
+    await expect(postChat(store, code, "not-a-token", "hey")).rejects.toBeInstanceOf(
+      RoomError
+    );
+  });
+
+  it("keeps the log bounded so the room row stays small", async () => {
+    const { code, tokens } = await fourPlayers();
+    for (let i = 0; i < 140; i++) await postChat(store, code, tokens[0], `msg ${i}`);
+    const chat = (await get(code)).chat;
+    expect(chat.length).toBeLessThanOrEqual(120);
+    expect(chat.at(-1)!.text).toBe("msg 139");
+  });
+
+  it("says nothing about hands — chat is visible to everyone", async () => {
+    const { code, tokens } = await fourPlayers();
+    await startMatch(store, code, tokens[0]);
+    for (let i = 0; i < 6; i++) await playCurrent(code, tokens);
+
+    const room = await get(code);
+    const hands = room.game!.hands.flat();
+    const said = viewFor(room, tokens[0])
+      .chat.map((c) => c.text)
+      .join(" ");
+    for (const id of hands) {
+      const [a, b] = id.split("-");
+      expect(said).not.toContain(`${a}|${b}`);
+    }
   });
 });
 

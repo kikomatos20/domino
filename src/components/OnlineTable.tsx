@@ -9,6 +9,7 @@ import DominoTile from "./DominoTile";
 import FeedbackButton from "./FeedbackButton";
 import PlayableHand from "./PlayableHand";
 import ReviewPanel from "./ReviewPanel";
+import TableChat from "./TableChat";
 import { useFading, useReplay } from "./useReplay";
 
 /** Seat labels rotate so you are always at the bottom of your own screen. */
@@ -26,6 +27,7 @@ export default function OnlineTable({
   onMove,
   onPass,
   onNextRound,
+  onChat,
   busy,
   error,
 }: {
@@ -33,6 +35,7 @@ export default function OnlineTable({
   onMove: (tileId: TileId, end: End) => void;
   onPass: () => void;
   onNextRound: () => void;
+  onChat: (text: string) => void;
   busy: boolean;
   error: string | null;
 }) {
@@ -119,7 +122,12 @@ export default function OnlineTable({
                 }`}
           </div>
         ) : (
-          <Board line={replay.line} lastAction={replay.lastAction} onEnds={setEnds} />
+          <Board
+            line={replay.line}
+            lastAction={replay.lastAction}
+            onEnds={setEnds}
+            viewer={you}
+          />
         )}
       </div>
 
@@ -195,6 +203,8 @@ export default function OnlineTable({
           onClose={() => setReviewing(false)}
         />
       )}
+
+      <TableChat chat={view.chat ?? []} you={you} onSend={onChat} busy={busy} />
 
       <FeedbackButton
         context={() => ({

@@ -121,6 +121,54 @@ describe("lineAxis", () => {
   });
 });
 
+describe("the table turns to face whoever is looking", () => {
+  // Everyone sits at the bottom of their own screen, so the same game has to be
+  // drawn differently for each player. East opening lies flat for East, and
+  // must read sideways to the player opposite them.
+  const line: PlacedTile[] = [
+    { left: 1, right: 6, seat: 1, opening: true },
+    { left: 6, right: 3, seat: 2 },
+  ];
+
+  it("lays the opening tile flat for the player who opened, whoever is watching", () => {
+    for (const opener of SEATS) {
+      const own: PlacedTile[] = [{ left: 1, right: 6, seat: opener, opening: true }];
+      // Seen by the opener: flat (horizontal), because they are at the bottom.
+      expect(layoutLine(own, 620, undefined, opener)[0].vertical).toBe(false);
+      // Seen from across the table: also flat — they are at the top.
+      expect(
+        layoutLine(own, 620, undefined, ((opener + 2) % 4) as Seat)[0].vertical
+      ).toBe(false);
+      // Seen from either side: sideways.
+      expect(
+        layoutLine(own, 620, undefined, ((opener + 1) % 4) as Seat)[0].vertical
+      ).toBe(true);
+      expect(
+        layoutLine(own, 620, undefined, ((opener + 3) % 4) as Seat)[0].vertical
+      ).toBe(true);
+    }
+  });
+
+  it("turns the whole chain with it, not just the opening tile", () => {
+    // East opened, so for East the chain runs up and down their own screen.
+    expect(lineAxis(line, 1)).toBe("v");
+    // For the player to East's left it runs across.
+    expect(lineAxis(line, 0)).toBe("h");
+    expect(lineAxis(line, 2)).toBe("h");
+    // And for the player opposite East, up and down again.
+    expect(lineAxis(line, 3)).toBe("v");
+  });
+
+  it("still joins up properly from every seat", () => {
+    for (const viewer of SEATS) {
+      const items = layoutLine(line, 620, undefined, viewer);
+      for (const [prev, next] of chainPairs(items)) {
+        expect(joinContact(prev, next)).toBeGreaterThanOrEqual(TILE_SHORT - EPSILON);
+      }
+    }
+  });
+});
+
 describe("the opening tile as spinner", () => {
   /** East opens 1|6; partner answers the 6, you answer the 1. */
   const line: PlacedTile[] = [

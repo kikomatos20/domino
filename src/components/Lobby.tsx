@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { PlayerView } from "@/server/types";
 import type { Seat } from "@/engine/types";
+import TableChat from "./TableChat";
 
 const SEAT_LABEL: Record<Seat, string> = {
   0: "South",
@@ -21,12 +22,14 @@ export default function Lobby({
   onSeat,
   onSettings,
   onStart,
+  onChat,
   busy,
 }: {
   view: PlayerView;
   onSeat: (seat: Seat) => void;
   onSettings: (s: { fillWithAi?: boolean; difficulty?: string }) => void;
   onStart: () => void;
+  onChat: (text: string) => void;
   busy: boolean;
 }) {
   const [copied, setCopied] = useState(false);
@@ -121,6 +124,10 @@ export default function Lobby({
           <p className="waiting">Waiting for the host to start…</p>
         )}
       </div>
+
+      {view.you && (
+        <TableChat chat={view.chat ?? []} you={view.you.seat} onSend={onChat} busy={busy} />
+      )}
     </main>
   );
 }

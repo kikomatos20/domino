@@ -5,6 +5,7 @@ import {
   leaveRoom,
   playMove,
   playPass,
+  postChat,
   startMatch,
   takeSeat,
   updateSettings,
@@ -57,6 +58,10 @@ export async function POST(
       }
       case "pass": {
         const room = await playPass(store, code, token);
+        return NextResponse.json({ view: viewFor(room, token) });
+      }
+      case "chat": {
+        const room = await postChat(store, code, token, String(body.text ?? ""));
         return NextResponse.json({ view: viewFor(room, token) });
       }
       case "nextRound": {

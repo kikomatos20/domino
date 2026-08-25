@@ -11,6 +11,21 @@ export interface Player {
   lastSeen: number;
 }
 
+/**
+ * One line in the table talk.
+ *
+ * Chat and the run of play share a single stream on purpose: "nice tile" reads
+ * very differently three moves later, and separating them loses the thread.
+ */
+export interface ChatEntry {
+  id: string;
+  kind: "chat" | "move" | "event";
+  seat: Seat | null;
+  who: string;
+  text: string;
+  at: number;
+}
+
 export interface Room {
   code: string;
   status: RoomStatus;
@@ -21,6 +36,8 @@ export interface Room {
   players: Player[];
   /** Absent until the host starts the match. */
   game?: GameState;
+  /** Table talk and the run of play, oldest first. */
+  chat: ChatEntry[];
   version: number;
   updatedAt: number;
 }
@@ -56,6 +73,7 @@ export interface PlayerView {
     isYou: boolean;
     tilesLeft: number;
   }[];
+  chat: ChatEntry[];
   game: {
     /** Only ever your own tiles. */
     hand: string[];

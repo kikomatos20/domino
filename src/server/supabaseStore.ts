@@ -7,7 +7,7 @@
  */
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Room, RoomStore } from "./types";
+import type { ChatEntry, Room, RoomStore } from "./types";
 import type { Difficulty } from "@/engine/ai";
 import type { GameState, Seat } from "@/engine/types";
 
@@ -38,6 +38,7 @@ interface RoomRow {
   target: number;
   host_token: string;
   version: number;
+  chat: ChatEntry[] | null;
   updated_at: string;
 }
 
@@ -128,6 +129,7 @@ export function createSupabaseStore(): RoomStore & {
           lastSeen: new Date(p.last_seen).getTime(),
         })),
         game: game?.state ?? undefined,
+        chat: room.chat ?? [],
         // Lives on the room, so it is meaningful in the lobby too.
         version: room.version ?? 0,
         updatedAt: new Date(room.updated_at).getTime(),
@@ -189,6 +191,7 @@ export function createSupabaseStore(): RoomStore & {
           lastSeen: p.lastSeen,
         })),
         p_state: room.game ?? null,
+        p_chat: room.chat ?? [],
       });
       if (error) throw error;
     },

@@ -169,6 +169,7 @@ export default function RoomClient({ code }: { code: string }) {
         onSeat={(seat: Seat) => send({ action: "seat", seat })}
         onSettings={(s) => send({ action: "settings", ...s })}
         onStart={() => send({ action: "start" })}
+        onChat={(text: string) => send({ action: "chat", text })}
       />
     );
   }
@@ -181,6 +182,7 @@ export default function RoomClient({ code }: { code: string }) {
       onMove={(tileId: TileId, end: End) => send({ action: "move", tileId, end })}
       onPass={() => send({ action: "pass" })}
       onNextRound={() => send({ action: "nextRound" })}
+      onChat={(text: string) => send({ action: "chat", text })}
     />
   );
 }
