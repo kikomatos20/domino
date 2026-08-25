@@ -974,6 +974,14 @@ body {
   transform: translate(-50%, -60%) scale(1.1) rotate(-3deg);
   pointer-events: none;
   filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.55));
+  transition: transform 90ms ease, opacity 90ms ease;
+}
+
+/* Over your own hand — letting go here puts the tile back, so say so. */
+.drag-ghost.returning {
+  transform: translate(-50%, -60%) scale(0.94) rotate(0deg);
+  opacity: 0.55;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
 }
 
 /* ---------- hold a tile to magnify it ---------- */

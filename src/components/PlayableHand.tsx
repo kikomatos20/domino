@@ -6,9 +6,8 @@ import type { End, Move, TileId } from "@/engine/types";
 import DominoTile from "./DominoTile";
 import ZoomedTile, { HOLD_MS } from "./ZoomedTile";
 import type { EndAnchors } from "./Board";
+import { resolveDrop } from "./dropTarget";
 
-/** How close to an end you have to drop for it to count. */
-const DROP_RADIUS = 90;
 /** Movement before a press becomes a drag rather than a tap. */
 const DRAG_THRESHOLD = 6;
 
@@ -47,6 +46,8 @@ export default function PlayableHand({
   const [zoomed, setZoomed] = useState<TileId | null>(null);
   const start = useRef<{ x: number; y: number } | null>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Dropping back here means "never mind", so we need to know where it is. */
+  const handRef = useRef<HTMLDivElement>(null);
   /** Set when a hold magnified the tile, so releasing does not also play it. */
   const held = useRef(false);
 
@@ -70,35 +71,16 @@ export default function PlayableHand({
     [active, movesFor]
   );
 
-  /**
-   * Which end the pointer is over.
-   *
-   * When a tile only fits one end there is nothing to choose, so dropping it
-   * anywhere plays it there — no need to hunt for the target.
-   */
+  /** Which end the pointer is over, or null if letting go would cancel. */
   const endUnder = useCallback(
-    (x: number, y: number): End | null => {
-      const only = [...activeEnds];
-      if (only.length === 1) return only[0];
-
-      let best: End | null = null;
-      let bestDistance = DROP_RADIUS;
-      for (const end of ["left", "right"] as End[]) {
-        if (!activeEnds.has(end)) continue;
-        const anchor = ends[end];
-        if (!anchor) continue;
-        const d = Math.hypot(anchor.x - x, anchor.y - y);
-        if (d < bestDistance) {
-          bestDistance = d;
-          best = end;
-        }
-      }
-      return best;
-    },
+    (x: number, y: number): End | null =>
+      resolveDrop(x, y, activeEnds, ends, handRef.current?.getBoundingClientRect() ?? null),
     [activeEnds, ends]
   );
 
   const hovered = drag && drag.moved ? endUnder(drag.x, drag.y) : null;
+  // Back over your hand: show the tile is coming home rather than being played.
+  const returning = Boolean(drag?.moved) && hovered === null;
 
   // Follow the pointer for the whole gesture, even outside the tile.
   useEffect(() => {
@@ -183,11 +165,27 @@ export default function PlayableHand({
     if (!yourTurn) setArmed(null);
   }, [yourTurn]);
 
+  // Escape backs out of a tile you have picked up but not committed.
+  useEffect(() => {
+    if (!drag && !armed) return;
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      cancelHold();
+      held.current = false;
+      start.current = null;
+      setZoomed(null);
+      setArmed(null);
+      setDrag(null);
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [drag, armed, cancelHold]);
+
   const canPlay = (id: TileId) => yourTurn && !disabled && playable.has(id);
 
   return (
     <>
-      <div className={`hand ${disabled ? "sending" : ""}`}>
+      <div ref={handRef} className={`hand ${disabled ? "sending" : ""}`}>
         {tiles.map((id) => {
           const { a, b } = parseTile(id);
           const usable = canPlay(id);
@@ -270,12 +268,15 @@ export default function PlayableHand({
 
       {/* The tile under your finger. */}
       {drag && drag.moved && (
-        <div className="drag-ghost" style={{ left: drag.x, top: drag.y }}>
+        <div
+          className={`drag-ghost ${returning ? "returning" : ""}`}
+          style={{ left: drag.x, top: drag.y }}
+        >
           <DominoTile
             left={parseTile(drag.tileId).a}
             right={parseTile(drag.tileId).b}
             vertical
-            highlight
+            highlight={!returning}
           />
         </div>
       )}
