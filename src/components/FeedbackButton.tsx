@@ -11,9 +11,12 @@ import type { FeedbackContext } from "./FeedbackForm";
 export default function FeedbackButton({
   context,
   label = "Feedback",
+  /** Sit in a toolbar instead of floating, so it cannot cover anything. */
+  inline = false,
 }: {
   context: () => FeedbackContext;
   label?: string;
+  inline?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [snapshot, setSnapshot] = useState<FeedbackContext | null>(null);
@@ -21,7 +24,7 @@ export default function FeedbackButton({
   return (
     <>
       <button
-        className="feedback-fab"
+        className={inline ? "chat-collapse" : "feedback-fab"}
         title="Send feedback"
         onClick={() => {
           // Grab the position as it is right now, before any dialog changes it.

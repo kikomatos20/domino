@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { ChatEntry } from "@/server/types";
 import type { Seat } from "@/engine/types";
 
@@ -20,6 +20,7 @@ export default function TableChat({
   open,
   onToggle,
   busy,
+  headerExtra,
 }: {
   chat: ChatEntry[];
   you: Seat;
@@ -27,6 +28,8 @@ export default function TableChat({
   open: boolean;
   onToggle: () => void;
   busy?: boolean;
+  /** Anything else that belongs in the dock's toolbar, e.g. Feedback. */
+  headerExtra?: ReactNode;
 }) {
   const [text, setText] = useState("");
   const [seen, setSeen] = useState(0);
@@ -51,17 +54,21 @@ export default function TableChat({
     setText("");
   };
 
-  // Out of the way entirely: a pill that gives the whole column back.
+  // Out of the way: a slim bar that gives the conversation's space back but
+  // still never sits on top of the table or your hand.
   if (!open) {
     return (
-      <button
-        className={`chat-toggle ${unread ? "unread" : ""}`}
-        onClick={onToggle}
-        title="Show table talk"
-      >
-        Chat
-        {unread > 0 && <span className="chat-badge">{unread}</span>}
-      </button>
+      <div className="chat-bar">
+        <button
+          className={`chat-toggle ${unread ? "unread" : ""}`}
+          onClick={onToggle}
+          title="Show table talk"
+        >
+          Chat
+          {unread > 0 && <span className="chat-badge">{unread}</span>}
+        </button>
+        {headerExtra}
+      </div>
     );
   }
 
@@ -69,9 +76,12 @@ export default function TableChat({
     <aside className="chat-dock" aria-label="Table chat">
       <header className="chat-head">
         <span className="chat-title">Table talk</span>
-        <button className="chat-collapse" onClick={onToggle} title="Hide chat">
-          Hide
-        </button>
+        <span className="chat-tools">
+          {headerExtra}
+          <button className="chat-collapse" onClick={onToggle} title="Hide chat">
+            Hide
+          </button>
+        </span>
       </header>
 
       <div className="chat-log" ref={log}>

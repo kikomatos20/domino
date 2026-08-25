@@ -7,6 +7,7 @@ import Board from "./Board";
 import type { EndAnchors } from "./Board";
 import DominoTile from "./DominoTile";
 import FeedbackButton from "./FeedbackButton";
+import type { FeedbackContext } from "./FeedbackForm";
 import PlayableHand from "./PlayableHand";
 import ReviewPanel from "./ReviewPanel";
 import TableChat from "./TableChat";
@@ -73,6 +74,21 @@ export default function OnlineTable({
 
   // Announce each tile as it lands, so you can follow a batch of moves that
   // arrived together.
+  const feedbackContext = (): FeedbackContext => ({
+    kind: "general",
+    mode: "online",
+    roomCode: view.code,
+    about: `Round ${game.roundNumber}, ${view.seats[you].nickname ?? "you"} in seat ${you}`,
+    payload: {
+      line: game.line,
+      ends: [game.leftEnd, game.rightEnd],
+      hand: game.hand,
+      currentSeat: game.currentSeat,
+      matchScore: game.matchScore,
+      seats: view.seats,
+    },
+  });
+
   const played = useFading(replay.justPlayed, 1500);
   const playedBanner = played
     ? `${seat(played.seat).isYou ? "You" : (seat(played.seat).nickname ?? "Computer")} played ${Math.min(played.left, played.right)} | ${Math.max(played.left, played.right)}`
@@ -213,23 +229,9 @@ export default function OnlineTable({
         open={chatOpen}
         onToggle={() => setChatOpen((o) => !o)}
         busy={busy}
-      />
-
-      <FeedbackButton
-        context={() => ({
-          kind: "general",
-          mode: "online",
-          roomCode: view.code,
-          about: `Round ${game.roundNumber}, ${view.seats[you].nickname ?? "you"} in seat ${you}`,
-          payload: {
-            line: game.line,
-            ends: [game.leftEnd, game.rightEnd],
-            hand: game.hand,
-            currentSeat: game.currentSeat,
-            matchScore: game.matchScore,
-            seats: view.seats,
-          },
-        })}
+        // Rides in the dock's toolbar — open or closed — so it never covers
+        // Send, the table, or your hand.
+        headerExtra={<FeedbackButton inline context={feedbackContext} />}
       />
     </main>
   );

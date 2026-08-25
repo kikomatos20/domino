@@ -309,11 +309,19 @@ body {
 }
 
 /* Sits beside the feedback button, out of the way of the hand. */
-.chat-toggle {
+/* The closed state. On a wide screen it tucks into the empty corner beside the
+   hand; on a phone it stays a row of the grid, where nothing can collide. */
+.chat-bar {
   position: fixed;
   left: 10px;
   bottom: 10px;
   z-index: 120;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chat-toggle {
   background: rgba(0, 0, 0, 0.45);
   border: 1px solid rgba(255, 255, 255, 0.22);
   color: #fff;
@@ -328,6 +336,17 @@ body {
 .chat-toggle:hover,
 .chat-toggle.unread {
   opacity: 1;
+}
+
+/* In the closed bar, Feedback matches the Chat pill rather than looking like
+   a stray bit of toolbar text. */
+.chat-bar .chat-collapse {
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.75rem;
+  opacity: 0.65;
 }
 
 .chat-badge {
@@ -369,6 +388,12 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   opacity: 0.7;
+}
+
+.chat-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .chat-collapse {
@@ -1559,14 +1584,66 @@ body {
     grid-template-columns: 34px 1fr 34px;
     gap: 2px;
     padding: 4px;
+    /* Keep the input clear of the iOS home bar. */
+    padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px));
   }
 
   .table-root.chat-hidden {
     grid-template-columns: 34px 1fr 34px;
   }
 
+  /* No free corner on a phone — the closed bar takes its own thin row so it
+     cannot land on the hand. */
+  .chat-bar {
+    position: static;
+    grid-area: chat;
+    justify-content: center;
+    padding-top: 2px;
+  }
+
+  .chat-toggle,
+  .chat-bar .chat-collapse {
+    padding: 4px 12px;
+    font-size: 0.7rem;
+  }
+
+  /* Tighter chrome so the height goes to the conversation, not the frame. */
   .chat-dock {
-    height: 122px;
+    height: 148px;
+    border-radius: 10px;
+  }
+
+  .chat-head {
+    padding: 5px 8px;
+  }
+
+  .chat-title {
+    font-size: 0.62rem;
+  }
+
+  .chat-log {
+    padding: 7px 8px;
+    gap: 4px;
+    font-size: 0.74rem;
+  }
+
+  .chat-move,
+  .chat-event {
+    font-size: 0.68rem;
+  }
+
+  .chat-input {
+    padding: 6px;
+  }
+
+  /* 16px or iOS zooms the whole page when you focus the field. */
+  .chat-input input {
+    font-size: 16px;
+    padding: 5px 8px;
+  }
+
+  .chat-input button {
+    padding: 5px 10px;
   }
 
   .lobby-stack .chat-dock {
