@@ -129,6 +129,23 @@ body {
   cursor: not-allowed;
 }
 
+/* Greyed out and inert, but still readable — it is a promise, not a control. */
+.home-button.soon {
+  opacity: 0.42;
+  cursor: default;
+  pointer-events: none;
+}
+
+.soon-tag {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
 .panel {
   background: rgba(0, 0, 0, 0.22);
   border-radius: 12px;
@@ -387,6 +404,13 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  opacity: 0.7;
+}
+
+/* Who the table is still waiting on between rounds. */
+.ready-note {
+  margin: 0;
+  font-size: 0.8rem;
   opacity: 0.7;
 }
 

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createMemoryStore } from "./memoryStore";
 import {
-  beginNextRound,
   createRoom,
   joinRoom,
   leaveRoom,
+  markReady,
   playMove,
   playPass,
   postChat,
@@ -37,6 +37,10 @@ async function get(code: string): Promise<Room> {
   const room = await store.get(code);
   if (!room) throw new Error("room vanished");
   return room;
+}
+
+function seatReady(room: Room, token: string): boolean {
+  return room.players.find((p) => p.token === token)?.ready ?? false;
 }
 
 /** Whoever's turn it is, played by their own token. */
@@ -275,7 +279,7 @@ describe("a full round with four humans", () => {
     expect(scored).toBeGreaterThanOrEqual(0);
 
     if (!room.game!.matchOver) {
-      await beginNextRound(store, code, tokens[1]);
+      for (const token of tokens) await markReady(store, code, token);
       const next = await get(code);
       expect(next.game!.roundNumber).toBe(2);
       expect(next.game!.roundOver).toBeNull();
@@ -325,6 +329,122 @@ describe("disconnections", () => {
 
     const after = await get(code);
     expect(after.game!.currentSeat).toBe(seat); // waits for them to return
+  });
+});
+
+describe("readying up between rounds", () => {
+  /** Play a room until the current round finishes. */
+  async function playOutRound(code: string, tokens: string[]): Promise<void> {
+    for (let i = 0; i < 60; i++) {
+      const room = await get(code);
+      if (room.game!.roundOver) return;
+      await playCurrent(code, tokens);
+    }
+    throw new Error("round never finished");
+  }
+
+  async function finishedRound() {
+    const { code, tokens } = await fourPlayers();
+    await startMatch(store, code, tokens[0]);
+    await playOutRound(code, tokens);
+    return { code, tokens };
+  }
+
+  it("does not deal the next round until everyone has said they are ready", async () => {
+    const { code, tokens } = await finishedRound();
+    const before = (await get(code)).game!.roundNumber;
+    if ((await get(code)).game!.matchOver) return;
+
+    for (const token of tokens.slice(0, 3)) {
+      await markReady(store, code, token);
+      // Three of four is not enough — the fourth may still be reading.
+      expect((await get(code)).game!.roundNumber).toBe(before);
+      expect((await get(code)).game!.roundOver).not.toBeNull();
+    }
+
+    await markReady(store, code, tokens[3]);
+    const after = await get(code);
+    expect(after.game!.roundNumber).toBe(before + 1);
+    expect(after.game!.roundOver).toBeNull();
+  });
+
+  it("keeps the finished round's history readable while people are still reading", async () => {
+    const { code, tokens } = await finishedRound();
+    if ((await get(code)).game!.matchOver) return;
+
+    await markReady(store, code, tokens[0]);
+    // The player who has not readied can still see the round they just played.
+    const view = viewFor(await get(code), tokens[3]);
+    expect(view.game!.roundOver).not.toBeNull();
+    expect(view.game!.history.length).toBeGreaterThan(0);
+    expect(view.game!.revealed).not.toBeNull();
+  });
+
+  it("lets you take it back if you readied too soon", async () => {
+    const { code, tokens } = await finishedRound();
+    if ((await get(code)).game!.matchOver) return;
+    const before = (await get(code)).game!.roundNumber;
+
+    await markReady(store, code, tokens[0]);
+    await markReady(store, code, tokens[0], false);
+    expect(seatReady(await get(code), tokens[0])).toBe(false);
+
+    // Everyone else readying is now not enough.
+    for (const token of tokens.slice(1)) await markReady(store, code, token);
+    expect((await get(code)).game!.roundNumber).toBe(before);
+
+    await markReady(store, code, tokens[0]);
+    expect((await get(code)).game!.roundNumber).toBe(before + 1);
+  });
+
+  it("clears the flags for the new round", async () => {
+    const { code, tokens } = await finishedRound();
+    if ((await get(code)).game!.matchOver) return;
+    for (const token of tokens) await markReady(store, code, token);
+    const after = await get(code);
+    expect(after.players.every((p) => !p.ready)).toBe(true);
+  });
+
+  it("does not wait on someone who has left the table", async () => {
+    const { code, tokens } = await finishedRound();
+    if ((await get(code)).game!.matchOver) return;
+    const before = (await get(code)).game!.roundNumber;
+
+    for (const token of tokens.slice(0, 3)) await markReady(store, code, token);
+    expect((await get(code)).game!.roundNumber).toBe(before);
+
+    // The fourth walks out rather than readying — the table moves on.
+    await leaveRoom(store, code, tokens[3]);
+    expect((await get(code)).game!.roundNumber).toBe(before + 1);
+  });
+
+  it("refuses to ready while the round is still being played", async () => {
+    const { code, tokens } = await fourPlayers();
+    await startMatch(store, code, tokens[0]);
+    await expect(markReady(store, code, tokens[0])).rejects.toBeInstanceOf(RoomError);
+  });
+
+  it("keeps both flags when two people ready at the same moment", async () => {
+    const { code, tokens } = await finishedRound();
+    if ((await get(code)).game!.matchOver) return;
+
+    await Promise.all([
+      markReady(store, code, tokens[0]),
+      markReady(store, code, tokens[1]),
+    ]);
+
+    // A whole-room write would have let the slower one overwrite the faster.
+    expect(seatReady(await get(code), tokens[0])).toBe(true);
+    expect(seatReady(await get(code), tokens[1])).toBe(true);
+  });
+
+  it("says who is ready in the view, so the table can see what it is waiting for", async () => {
+    const { code, tokens } = await finishedRound();
+    if ((await get(code)).game!.matchOver) return;
+    await markReady(store, code, tokens[1]);
+    const view = viewFor(await get(code), tokens[0]);
+    const ready = view.seats.filter((s) => s.ready).map((s) => s.nickname);
+    expect(ready).toEqual(["Ana"]);
   });
 });
 

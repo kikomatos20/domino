@@ -181,7 +181,7 @@ export default function RoomClient({ code }: { code: string }) {
       error={error}
       onMove={(tileId: TileId, end: End) => send({ action: "move", tileId, end })}
       onPass={() => send({ action: "pass" })}
-      onNextRound={() => send({ action: "nextRound" })}
+      onReady={(ready: boolean) => send({ action: "ready", ready })}
       onChat={(text: string) => send({ action: "chat", text })}
     />
   );

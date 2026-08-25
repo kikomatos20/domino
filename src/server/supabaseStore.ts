@@ -48,6 +48,7 @@ interface PlayerRow {
   token: string;
   connected: boolean;
   last_seen: string;
+  ready: boolean | null;
 }
 
 /** Rows written to the feedback table. */
@@ -127,6 +128,7 @@ export function createSupabaseStore(): RoomStore & {
           token: p.token,
           connected: p.connected,
           lastSeen: new Date(p.last_seen).getTime(),
+          ready: p.ready ?? false,
         })),
         game: game?.state ?? undefined,
         chat: room.chat ?? [],
@@ -189,11 +191,31 @@ export function createSupabaseStore(): RoomStore & {
           token: p.token,
           connected: p.connected,
           lastSeen: p.lastSeen,
+          ready: p.ready,
         })),
         p_state: room.game ?? null,
         p_chat: room.chat ?? [],
       });
       if (error) throw error;
+    },
+
+    /**
+     * Flag one player ready. A targeted update, not a whole-room write, so two
+     * people clicking Ready at the same instant both stick.
+     */
+    async setReady(code, token, ready) {
+      const db = admin();
+      const { data: room } = await db
+        .from("rooms")
+        .select("id")
+        .eq("code", code)
+        .maybeSingle<{ id: string }>();
+      if (!room) return;
+      await db
+        .from("players")
+        .update({ ready })
+        .eq("room_id", room.id)
+        .eq("token", token);
     },
 
     /** Mark a player present without rewriting the game. */

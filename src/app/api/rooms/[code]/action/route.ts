@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import {
-  beginNextRound,
   heartbeat,
   leaveRoom,
+  markReady,
   playMove,
   playPass,
   postChat,
@@ -64,8 +64,8 @@ export async function POST(
         const room = await postChat(store, code, token, String(body.text ?? ""));
         return NextResponse.json({ view: viewFor(room, token) });
       }
-      case "nextRound": {
-        const room = await beginNextRound(store, code, token);
+      case "ready": {
+        const room = await markReady(store, code, token, body.ready !== false);
         return NextResponse.json({ view: viewFor(room, token) });
       }
       case "leave": {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { End, Seat, TileId } from "@/engine/types";
+import type { End, GameState, Seat, TileId } from "@/engine/types";
 import type { PlayerView } from "@/server/types";
 import Board from "./Board";
 import type { EndAnchors } from "./Board";
@@ -27,7 +27,7 @@ export default function OnlineTable({
   view,
   onMove,
   onPass,
-  onNextRound,
+  onReady,
   onChat,
   busy,
   error,
@@ -35,12 +35,17 @@ export default function OnlineTable({
   view: PlayerView;
   onMove: (tileId: TileId, end: End) => void;
   onPass: () => void;
-  onNextRound: () => void;
+  onReady: (ready: boolean) => void;
   onChat: (text: string) => void;
   busy: boolean;
   error: string | null;
 }) {
   const [reviewing, setReviewing] = useState(false);
+  /**
+   * The review reads the finished round's history, which the server clears when
+   * the next one is dealt. Hold a copy so what you are reading cannot vanish.
+   */
+  const [reviewHistory, setReviewHistory] = useState<GameState["history"]>([]);
   // Open by default — half the point of table talk is seeing it arrive.
   const [chatOpen, setChatOpen] = useState(true);
   const [ends, setEnds] = useState<EndAnchors>({ left: null, right: null });
@@ -74,6 +79,21 @@ export default function OnlineTable({
 
   // Announce each tile as it lands, so you can follow a batch of moves that
   // arrived together.
+  const openReview = () => {
+    setReviewHistory(game.history);
+    setReviewing(true);
+  };
+
+  // Only people actually at the table hold the round up: empty seats are
+  // computers, and someone who has dropped is covered by one.
+  const atTable = view.seats.filter((s) => s.nickname && s.connected);
+  const youAreReady = view.seats[you].ready;
+  const waitingFor = atTable
+    .filter((s) => !s.ready && !s.isYou)
+    .map((s) => s.nickname as string);
+  const readyCount = atTable.filter((s) => s.ready).length;
+  const humansAtTable = atTable.length;
+
   const feedbackContext = (): FeedbackContext => ({
     kind: "general",
     mode: "online",
@@ -179,7 +199,7 @@ export default function OnlineTable({
                 <p className="final">
                   {usScore} — {themScore}
                 </p>
-                <button className="secondary" onClick={() => setReviewing(true)}>
+                <button className="secondary" onClick={openReview}>
                   Review your play
                 </button>
                 <a className="home-button" href="/online">
@@ -200,12 +220,26 @@ export default function OnlineTable({
                     scores <strong>{game.roundOver.points}</strong> points
                   </p>
                 )}
-                <button className="secondary" onClick={() => setReviewing(true)}>
+                <button className="secondary" onClick={openReview}>
                   Review your play
                 </button>
-                <button disabled={busy} onClick={onNextRound}>
-                  Next round
+
+                {/* Nobody's click starts the next round but everybody's. Take
+                    as long as you like over the review. */}
+                <button
+                  className={youAreReady ? "secondary" : ""}
+                  disabled={busy}
+                  onClick={() => onReady(!youAreReady)}
+                >
+                  {youAreReady ? "Wait — not ready" : "Ready for next round"}
                 </button>
+                {waitingFor.length > 0 && (
+                  <p className="ready-note">
+                    {youAreReady
+                      ? `Waiting for ${waitingFor.join(", ")}`
+                      : `${readyCount} of ${humansAtTable} ready`}
+                  </p>
+                )}
               </>
             )}
           </div>
@@ -214,7 +248,7 @@ export default function OnlineTable({
 
       {reviewing && (
         <ReviewPanel
-          history={game.history}
+          history={reviewHistory}
           seat={you}
           mode="online"
           roomCode={view.code}

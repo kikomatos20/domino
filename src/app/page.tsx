@@ -14,6 +14,11 @@ export default function Home() {
           <Link className="home-button" href="/online">
             Play with Friends
           </Link>
+          {/* Not a link yet — announced, not clickable. */}
+          <div className="home-button soon" aria-disabled="true">
+            Academy
+            <span className="soon-tag">coming soon</span>
+          </div>
         </div>
 
         <p className="home-note">

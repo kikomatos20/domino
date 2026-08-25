@@ -131,7 +131,9 @@ export async function createRoom(
     difficulty: opts.difficulty ?? "medium",
     target: opts.target ?? 100,
     hostToken: token,
-    players: [{ seat: 0, nickname, token, connected: true, lastSeen: Date.now() }],
+    players: [
+      { seat: 0, nickname, token, connected: true, lastSeen: Date.now(), ready: false },
+    ],
     chat: [],
     version: 1,
     updatedAt: Date.now(),
@@ -161,6 +163,7 @@ export async function joinRoom(
     token,
     connected: true,
     lastSeen: Date.now(),
+    ready: false,
   });
   say(room, { kind: "event", seat: open[0], who: "", text: `${name} sat down` });
   await save(store, room);
@@ -218,9 +221,17 @@ export async function leaveRoom(
   } else {
     // Mid-game, keep the seat so they can come back; the AI covers meanwhile.
     player.connected = false;
+    player.ready = false;
     // Take over straight away, otherwise the table sits waiting on someone who
     // has already gone.
     if (room.fillWithAi) await advanceAi(room);
+
+    // Walking out must not leave everyone else stuck on the scoreboard waiting
+    // for a player who is no longer there.
+    const game = room.game;
+    if (game?.roundOver && !game.matchOver && waitingOn(room).length === 0) {
+      return dealNextRound(store, room, game);
+    }
   }
   await save(store, room);
   return room;
@@ -328,19 +339,68 @@ export async function playPass(
   return room;
 }
 
-/** Any seated player may move the match on once a round has finished. */
-export async function beginNextRound(
+/**
+ * Who still has to say they are ready before the next round is dealt.
+ *
+ * Only people actually at the table count. Empty seats are computers, and
+ * someone who has dropped should not hold the game up indefinitely.
+ */
+function waitingOn(room: Room): Player[] {
+  return room.players.filter((p) => p.connected && !p.ready);
+}
+
+/**
+ * Say you are done with the round on screen.
+ *
+ * The round only moves on once everybody still at the table has said so.
+ * Reading the review takes as long as it takes, and nobody else's click should
+ * pull it out from under you.
+ */
+export async function markReady(
   store: RoomStore,
   code: string,
-  token: string
+  token: string,
+  ready = true
 ): Promise<Room> {
   const room = await mustGet(store, code);
-  requirePlayer(room, token);
+  const player = requirePlayer(room, token);
   const game = requireGame(room);
   if (!game.roundOver) throw new RoomError("The round is still going", 409);
   if (game.matchOver) throw new RoomError("The match is over", 409);
 
+  if (player.ready === ready) return room; // already said so; nothing to do
+  player.ready = ready;
+
+  if (store.setReady) {
+    // One column on one row. A whole-room write here would drop the other
+    // player's flag whenever two people click at the same moment.
+    await store.setReady(code, token, ready);
+    await store.notify?.(code, room.version);
+  } else {
+    await save(store, room);
+  }
+
+  if (!ready) return room;
+
+  // Re-read, so the decision is made on everyone's flags rather than the ones
+  // we happened to arrive with.
+  const fresh = store.setReady ? ((await store.get(code)) ?? room) : room;
+  const freshGame = fresh.game;
+  // Someone else may have completed the set while we were writing.
+  if (!freshGame?.roundOver || freshGame.matchOver) return fresh;
+  if (waitingOn(fresh).length > 0) return fresh;
+
+  return dealNextRound(store, fresh, freshGame);
+}
+
+async function dealNextRound(
+  store: RoomStore,
+  room: Room,
+  game: GameState
+): Promise<Room> {
   room.game = nextRound(game);
+  // The flags describe the round that just ended, so they go with it.
+  for (const p of room.players) p.ready = false;
   say(room, {
     kind: "event",
     seat: null,
@@ -419,6 +479,7 @@ export function viewFor(room: Room, token: string | null): PlayerView {
       isAi: !player || (!player.connected && room.fillWithAi),
       isYou: !!me && me.seat === seat,
       tilesLeft: game ? game.hands[seat].length : 0,
+      ready: player?.ready ?? false,
     };
   });
 

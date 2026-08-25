@@ -22,6 +22,10 @@ export function createMemoryStore(): RoomStore & { clear(): void } {
       if (rooms.has(room.code)) throw new Error(`Room ${room.code} already exists`);
       rooms.set(room.code, clone(room));
     },
+    async setReady(code, token, ready) {
+      const player = rooms.get(code)?.players.find((p) => p.token === token);
+      if (player) player.ready = ready;
+    },
     async touchPlayer(code, token) {
       const room = rooms.get(code);
       const player = room?.players.find((p) => p.token === token);

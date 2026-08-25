@@ -9,6 +9,11 @@ export interface Player {
   token: string;
   connected: boolean;
   lastSeen: number;
+  /**
+   * Said they are done looking at the round that just finished. Cleared when
+   * the next round is dealt, so it always refers to the round on screen.
+   */
+  ready: boolean;
 }
 
 /**
@@ -54,6 +59,13 @@ export interface RoomStore {
    * Kept separate from `put` so a heartbeat can never overwrite a move.
    */
   touchPlayer?(code: string, token: string): Promise<void>;
+  /**
+   * Flag one player ready, without rewriting the room.
+   *
+   * Two people clicking Ready at the same moment would otherwise race through
+   * a whole-room write and one of the two flags would be lost.
+   */
+  setReady?(code: string, token: string, ready: boolean): Promise<void>;
 }
 
 /** What a single player is allowed to see. */
@@ -72,6 +84,8 @@ export interface PlayerView {
     isAi: boolean;
     isYou: boolean;
     tilesLeft: number;
+    /** Ready for the next round. Meaningless while a round is in progress. */
+    ready: boolean;
   }[];
   chat: ChatEntry[];
   game: {
