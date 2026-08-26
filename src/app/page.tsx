@@ -25,6 +25,13 @@ export default function Home() {
           Playing with friends creates a room code you can share. Empty seats can
           be filled by the computer.
         </p>
+
+        <p className="home-note">
+          <Link className="quiet-link" href="/account">
+            Sign in to keep your record
+          </Link>{" "}
+          — optional, and never needed to play.
+        </p>
       </div>
     </main>
   );

@@ -14,6 +14,11 @@ export interface Player {
    * the next round is dealt, so it always refers to the round on screen.
    */
   ready: boolean;
+  /**
+   * A seat this player has asked to trade for, pending the occupant's answer.
+   * At most one at a time, and cleared whenever the seats actually move.
+   */
+  wantsSeat: Seat | null;
 }
 
 /**
@@ -87,6 +92,8 @@ export interface PlayerView {
     /** Ready for the next round. Meaningless while a round is in progress. */
     ready: boolean;
   }[];
+  /** Outstanding seat swap requests, from one seat to another. Lobby only. */
+  swaps: { from: Seat; to: Seat }[];
   chat: ChatEntry[];
   game: {
     /** Only ever your own tiles. */

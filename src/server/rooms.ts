@@ -24,6 +24,14 @@ import { RoomError } from "./types";
 import type { ChatEntry, Player, PlayerView, Room, RoomStore } from "./types";
 
 const SEATS: Seat[] = [0, 1, 2, 3];
+
+/** Seats as people refer to them at the table. */
+const SEAT_NAME: Record<Seat, string> = {
+  0: "South",
+  1: "East",
+  2: "North",
+  3: "West",
+};
 /** No I, O, 0 or 1 — they get misread when people share a code out loud. */
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -159,7 +167,15 @@ export async function createRoom(
     target: opts.target ?? 100,
     hostToken: token,
     players: [
-      { seat: 0, nickname, token, connected: true, lastSeen: Date.now(), ready: false },
+      {
+        seat: 0,
+        nickname,
+        token,
+        connected: true,
+        lastSeen: Date.now(),
+        ready: false,
+        wantsSeat: null,
+      },
     ],
     chat: [],
     version: 1,
@@ -191,13 +207,20 @@ export async function joinRoom(
     connected: true,
     lastSeen: Date.now(),
     ready: false,
+    wantsSeat: null,
   });
   say(room, { kind: "event", seat: open[0], who: "", text: `${name} sat down` });
   await save(store, room);
   return { room, token };
 }
 
-/** Move yourself to a free seat, so partners can sit across from each other. */
+/**
+ * Sit somewhere else, so partners can arrange themselves across the table.
+ *
+ * An empty seat you simply take. An occupied one you have to ask for — see
+ * `requestSwap`. Taking someone's seat out from under them changes who they
+ * are partnered with, which is not a thing to do to somebody without asking.
+ */
 export async function takeSeat(
   store: RoomStore,
   code: string,
@@ -207,10 +230,96 @@ export async function takeSeat(
   const room = await mustGet(store, code);
   if (room.status !== "lobby") throw new RoomError("The game has already started", 409);
   const player = requirePlayer(room, token);
-  if (isHuman(room, seat) && player.seat !== seat) {
-    throw new RoomError("That seat is taken", 409);
+  if (player.seat === seat) return room;
+  if (isHuman(room, seat)) {
+    throw new RoomError("Someone is sitting there — ask them to swap", 409);
   }
+
   player.seat = seat;
+  clearSwaps(room);
+  say(room, {
+    kind: "event",
+    seat,
+    who: player.nickname,
+    text: `${player.nickname} moved to ${SEAT_NAME[seat]}`,
+  });
+  await save(store, room);
+  return room;
+}
+
+/** Nobody's outstanding request survives the seats moving underneath it. */
+function clearSwaps(room: Room): void {
+  for (const p of room.players) p.wantsSeat = null;
+}
+
+/**
+ * Ask the player in `seat` to trade places.
+ *
+ * One outstanding request per person: asking somewhere else replaces the old
+ * one, so nobody can paper the lobby with requests.
+ */
+export async function requestSwap(
+  store: RoomStore,
+  code: string,
+  token: string,
+  seat: Seat
+): Promise<Room> {
+  const room = await mustGet(store, code);
+  if (room.status !== "lobby") throw new RoomError("The game has already started", 409);
+  const player = requirePlayer(room, token);
+  if (player.seat === seat) throw new RoomError("You are already sitting there");
+
+  const sitting = room.players.find((p) => p.seat === seat && p.token !== token);
+  if (!sitting) throw new RoomError("Nobody is sitting there — just take the seat", 409);
+
+  player.wantsSeat = seat;
+  say(room, {
+    kind: "event",
+    seat: player.seat,
+    who: player.nickname,
+    text: `${player.nickname} asked ${sitting.nickname} to swap seats`,
+  });
+  await save(store, room);
+  return room;
+}
+
+/** Answer whoever asked for your seat. */
+export async function respondSwap(
+  store: RoomStore,
+  code: string,
+  token: string,
+  accept: boolean
+): Promise<Room> {
+  const room = await mustGet(store, code);
+  if (room.status !== "lobby") throw new RoomError("The game has already started", 409);
+  const player = requirePlayer(room, token);
+
+  const asker = room.players.find((p) => p.wantsSeat === player.seat);
+  if (!asker) throw new RoomError("Nobody has asked for your seat", 409);
+
+  asker.wantsSeat = null;
+
+  if (!accept) {
+    say(room, {
+      kind: "event",
+      seat: player.seat,
+      who: player.nickname,
+      text: `${player.nickname} would rather keep ${SEAT_NAME[player.seat]}`,
+    });
+    await save(store, room);
+    return room;
+  }
+
+  const mine = player.seat;
+  player.seat = asker.seat;
+  asker.seat = mine;
+  clearSwaps(room);
+  say(room, {
+    kind: "event",
+    seat: asker.seat,
+    who: asker.nickname,
+    text: `${asker.nickname} and ${player.nickname} swapped seats`,
+  });
   await save(store, room);
   return room;
 }
@@ -514,6 +623,10 @@ export function viewFor(room: Room, token: string | null): PlayerView {
     };
   });
 
+  const swaps = room.players
+    .filter((p) => p.wantsSeat !== null)
+    .map((p) => ({ from: p.seat, to: p.wantsSeat as Seat }));
+
   return {
     code: room.code,
     status: room.status,
@@ -523,6 +636,7 @@ export function viewFor(room: Room, token: string | null): PlayerView {
     difficulty: room.difficulty,
     target: room.target,
     seats,
+    swaps,
     chat: room.chat ?? [],
     game:
       game && me

@@ -49,6 +49,7 @@ interface PlayerRow {
   connected: boolean;
   last_seen: string;
   ready: boolean | null;
+  wants_seat: number | null;
 }
 
 /** Rows written to the feedback table. */
@@ -129,6 +130,7 @@ export function createSupabaseStore(): RoomStore & {
           connected: p.connected,
           lastSeen: new Date(p.last_seen).getTime(),
           ready: p.ready ?? false,
+          wantsSeat: (p.wants_seat ?? null) as Seat | null,
         })),
         game: game?.state ?? undefined,
         chat: room.chat ?? [],
@@ -192,6 +194,7 @@ export function createSupabaseStore(): RoomStore & {
           connected: p.connected,
           lastSeen: p.lastSeen,
           ready: p.ready,
+          wantsSeat: p.wantsSeat,
         })),
         p_state: room.game ?? null,
         p_chat: room.chat ?? [],

@@ -6,6 +6,8 @@ import {
   playMove,
   playPass,
   postChat,
+  requestSwap,
+  respondSwap,
   startMatch,
   takeSeat,
   updateSettings,
@@ -35,6 +37,14 @@ export async function POST(
     switch (body?.action) {
       case "seat": {
         const room = await takeSeat(store, code, token, Number(body.seat) as Seat);
+        return NextResponse.json({ view: viewFor(room, token) });
+      }
+      case "askSwap": {
+        const room = await requestSwap(store, code, token, Number(body.seat) as Seat);
+        return NextResponse.json({ view: viewFor(room, token) });
+      }
+      case "answerSwap": {
+        const room = await respondSwap(store, code, token, body.accept === true);
         return NextResponse.json({ view: viewFor(room, token) });
       }
       case "settings": {

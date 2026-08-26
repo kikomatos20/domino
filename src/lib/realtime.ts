@@ -14,48 +14,10 @@
  * nothing about anybody's tiles.
  */
 
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-
-let client: SupabaseClient | null = null;
-
-/**
- * The browser-safe key, under either name.
- *
- * Supabase replaced the legacy `anon` JWT with a publishable key
- * (`sb_publishable_…`). Both work here, so a project on either scheme is fine.
- *
- * These have to be written out in full rather than looked up dynamically —
- * Next.js inlines `process.env.NEXT_PUBLIC_*` at build time by matching the
- * literal text, so a computed key name would come back undefined.
- */
-function publishableKey(): string | undefined {
-  return (
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    undefined
-  );
-}
+import { browserClient, supabaseConfigured } from "./supabaseBrowser";
 
 /** Configured only if the browser has been given a publishable key. */
-export function realtimeConfigured(): boolean {
-  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && publishableKey());
-}
-
-function browserClient(): SupabaseClient | null {
-  if (!realtimeConfigured()) return null;
-  if (!client) {
-    client = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      publishableKey()!,
-      {
-        auth: { persistSession: false },
-        // No need to hear about our own noise faster than we can draw it.
-        realtime: { params: { eventsPerSecond: 5 } },
-      }
-    );
-  }
-  return client;
-}
+export const realtimeConfigured = supabaseConfigured;
 
 export interface RoomChannel {
   close(): void;

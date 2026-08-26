@@ -409,6 +409,58 @@ body {
   opacity: 0.7;
 }
 
+.quiet-link {
+  color: #9fc7ff;
+}
+
+/* A button that reads as a link — switching between signing in and up. */
+.panel button.link {
+  background: none;
+  border: none;
+  color: #9fc7ff;
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 2px;
+  text-decoration: underline;
+}
+
+/* Seat swaps: asked for, and waiting on an answer. */
+.seat-pending {
+  font-size: 0.72rem;
+  opacity: 0.6;
+  font-style: italic;
+}
+
+.seat-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 4px;
+  font-size: 0.72rem;
+}
+
+.seat-ask-buttons {
+  display: flex;
+  gap: 5px;
+}
+
+.seat-ask-buttons button {
+  flex: 1;
+  border: none;
+  border-radius: 7px;
+  padding: 4px 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  background: var(--gold);
+  color: #1a1a1a;
+}
+
+.seat-ask-buttons button.secondary {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
 /* The round log: passes, and where the lead went because of them. */
 .round-log {
   list-style: none;

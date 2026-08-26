@@ -8,6 +8,8 @@ import {
   playMove,
   playPass,
   postChat,
+  requestSwap,
+  respondSwap,
   startMatch,
   takeSeat,
   updateSettings,
@@ -81,8 +83,10 @@ describe("lobby", () => {
     await takeSeat(store, room.code, joined.token, 2);
     const after = await get(room.code);
     expect(after.players.find((p) => p.nickname === "Ana")!.seat).toBe(2);
-    // And cannot pinch an occupied one.
-    await expect(takeSeat(store, room.code, joined.token, 0)).rejects.toThrow(/taken/i);
+    // And cannot pinch an occupied one — that has to be asked for.
+    await expect(takeSeat(store, room.code, joined.token, 0)).rejects.toThrow(
+      /ask them to swap/i
+    );
     void token;
   });
 
@@ -329,6 +333,107 @@ describe("disconnections", () => {
 
     const after = await get(code);
     expect(after.game!.currentSeat).toBe(seat); // waits for them to return
+  });
+});
+
+describe("swapping seats in the lobby", () => {
+  async function two() {
+    const { room, token } = await createRoom(store, { nickname: "Kiko" });
+    const ana = (await joinRoom(store, room.code, "Ana")).token;
+    return { code: room.code, kiko: token, ana };
+  }
+
+  const seatOf = async (code: string, token: string) =>
+    (await get(code)).players.find((p) => p.token === token)!.seat;
+
+  it("takes an empty seat without asking anyone", async () => {
+    const { code, kiko } = await two();
+    await takeSeat(store, code, kiko, 2);
+    expect(await seatOf(code, kiko)).toBe(2);
+  });
+
+  it("refuses to take a seat somebody is sitting in", async () => {
+    const { code, kiko, ana } = await two();
+    const anaSeat = await seatOf(code, ana);
+    await expect(takeSeat(store, code, kiko, anaSeat)).rejects.toBeInstanceOf(RoomError);
+    // Nobody moved.
+    expect(await seatOf(code, ana)).toBe(anaSeat);
+  });
+
+  it("swaps only once the other player agrees", async () => {
+    const { code, kiko, ana } = await two();
+    const kikoSeat = await seatOf(code, kiko);
+    const anaSeat = await seatOf(code, ana);
+
+    await requestSwap(store, code, kiko, anaSeat);
+    // Asking on its own changes nothing.
+    expect(await seatOf(code, kiko)).toBe(kikoSeat);
+    expect(await seatOf(code, ana)).toBe(anaSeat);
+
+    // Ana sees the request against her own seat.
+    const view = viewFor(await get(code), ana);
+    expect(view.swaps).toEqual([{ from: kikoSeat, to: anaSeat }]);
+
+    await respondSwap(store, code, ana, true);
+    expect(await seatOf(code, kiko)).toBe(anaSeat);
+    expect(await seatOf(code, ana)).toBe(kikoSeat);
+    // And the request is spent.
+    expect(viewFor(await get(code), ana).swaps).toEqual([]);
+  });
+
+  it("leaves everyone where they are on a refusal", async () => {
+    const { code, kiko, ana } = await two();
+    const kikoSeat = await seatOf(code, kiko);
+    const anaSeat = await seatOf(code, ana);
+
+    await requestSwap(store, code, kiko, anaSeat);
+    await respondSwap(store, code, ana, false);
+
+    expect(await seatOf(code, kiko)).toBe(kikoSeat);
+    expect(await seatOf(code, ana)).toBe(anaSeat);
+    expect(viewFor(await get(code), ana).swaps).toEqual([]);
+  });
+
+  it("only lets the person being asked answer", async () => {
+    const { code, tokens } = await fourPlayers();
+    await requestSwap(store, code, tokens[0], 2);
+    // Seat 1 was not asked, so there is nothing for them to accept.
+    await expect(respondSwap(store, code, tokens[1], true)).rejects.toBeInstanceOf(
+      RoomError
+    );
+  });
+
+  it("keeps one request per person, so the lobby cannot be papered", async () => {
+    const { code, tokens } = await fourPlayers();
+    await requestSwap(store, code, tokens[0], 1);
+    await requestSwap(store, code, tokens[0], 2);
+    const view = viewFor(await get(code), tokens[0]);
+    expect(view.swaps).toEqual([{ from: 0, to: 2 }]);
+  });
+
+  it("drops stale requests when the seats move underneath them", async () => {
+    const { code, tokens } = await fourPlayers();
+    await requestSwap(store, code, tokens[1], 2);
+    // Seat 3 leaves, and seat 0 moves into the gap.
+    await leaveRoom(store, code, tokens[3]);
+    await takeSeat(store, code, tokens[0], 3);
+    expect(viewFor(await get(code), tokens[1]).swaps).toEqual([]);
+  });
+
+  it("will not rearrange the table once the match has started", async () => {
+    const { code, tokens } = await fourPlayers();
+    await startMatch(store, code, tokens[0]);
+    await expect(requestSwap(store, code, tokens[0], 1)).rejects.toBeInstanceOf(RoomError);
+    await expect(takeSeat(store, code, tokens[0], 1)).rejects.toBeInstanceOf(RoomError);
+  });
+
+  it("says in the chat who swapped with whom", async () => {
+    const { code, kiko, ana } = await two();
+    await requestSwap(store, code, kiko, await seatOf(code, ana));
+    await respondSwap(store, code, ana, true);
+    const said = (await get(code)).chat.map((c) => c.text).join(" | ");
+    expect(said).toMatch(/Kiko asked Ana to swap/);
+    expect(said).toMatch(/swapped seats/);
   });
 });
 

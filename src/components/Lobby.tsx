@@ -23,10 +23,14 @@ export default function Lobby({
   onSettings,
   onStart,
   onChat,
+  onAskSwap,
+  onAnswerSwap,
   busy,
 }: {
   view: PlayerView;
   onSeat: (seat: Seat) => void;
+  onAskSwap: (seat: Seat) => void;
+  onAnswerSwap: (accept: boolean) => void;
   onSettings: (s: { fillWithAi?: boolean; difficulty?: string }) => void;
   onStart: () => void;
   onChat: (text: string) => void;
@@ -36,6 +40,10 @@ export default function Lobby({
   const [chatOpen, setChatOpen] = useState(true);
   const isHost = view.you?.isHost ?? false;
   const humans = view.seats.filter((s) => s.nickname).length;
+
+  // Someone waiting on you, and the seat you are waiting on.
+  const incoming = view.swaps.find((s) => s.to === view.you?.seat) ?? null;
+  const asked = view.swaps.find((s) => s.from === view.you?.seat)?.to ?? null;
 
   const copyCode = async () => {
     try {
@@ -78,6 +86,42 @@ export default function Lobby({
                 <button className="seat-take" disabled={busy} onClick={() => onSeat(s.seat)}>
                   Sit here
                 </button>
+              )}
+
+              {/* Somebody is there, so ask rather than take. */}
+              {s.nickname && !s.isYou && view.you && (
+                asked === s.seat ? (
+                  <span className="seat-pending">Asked…</span>
+                ) : (
+                  <button
+                    className="seat-take"
+                    disabled={busy}
+                    onClick={() => onAskSwap(s.seat)}
+                  >
+                    Ask to swap
+                  </button>
+                )
+              )}
+
+              {/* Your own seat, with someone waiting on an answer. */}
+              {s.isYou && incoming && (
+                <div className="seat-ask">
+                  <span>
+                    {view.seats[incoming.from].nickname} wants to swap
+                  </span>
+                  <div className="seat-ask-buttons">
+                    <button disabled={busy} onClick={() => onAnswerSwap(true)}>
+                      Swap
+                    </button>
+                    <button
+                      className="secondary"
+                      disabled={busy}
+                      onClick={() => onAnswerSwap(false)}
+                    >
+                      No
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           ))}
