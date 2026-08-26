@@ -15,8 +15,19 @@ function tokenFrom(request: Request): string | null {
 /** Your own record. Nobody can ask for anyone else's — there is no parameter. */
 export async function GET(request: Request) {
   try {
-    const account = await accountFor(tokenFrom(request));
-    if (!account) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+    const token = tokenFrom(request);
+    const account = await accountFor(token);
+    if (!account) {
+      // Two very different failures that look identical from the outside: the
+      // browser never sent a session, or it sent one that has since expired.
+      return NextResponse.json(
+        {
+          error: "Not signed in",
+          reason: token ? "session expired or rejected" : "no session sent",
+        },
+        { status: 401 }
+      );
+    }
     const [record, stats] = await Promise.all([
       recordFor(account.id),
       statsFor(account.id),

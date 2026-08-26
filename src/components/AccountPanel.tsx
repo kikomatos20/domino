@@ -86,16 +86,35 @@ export default function AccountPanel() {
     <main className="home">
       <AppMenu className="corner" />
       <div className="home-card">
-        <h1>{account ? account.username : "Your account"}</h1>
+        {/* The name lives in the profile card below when signed in. */}
+        {!account && <h1>Your account</h1>}
 
         {loading ? (
           <p className="home-sub">One moment…</p>
         ) : account ? (
           <>
+            {/* Who you are, always — not only once there are results. */}
+            <div className="profile">
+              <span className="profile-avatar">
+                {account.username.slice(0, 1).toUpperCase()}
+              </span>
+              <span className="profile-lines">
+                <span className="profile-name">{account.username}</span>
+                <span className="profile-sub">
+                  {stats
+                    ? `${stats.online.played + stats.solo.played} matches played`
+                    : "Signed in"}
+                </span>
+              </span>
+            </div>
+
             {stats ? (
               <StatsPanel stats={stats} />
             ) : (
-              <p className="home-sub">Signed in. Match results are saved to this name.</p>
+              <p className="home-sub">
+                Could not load your stats just now. They are safe — try again in
+                a moment.
+              </p>
             )}
 
             <div className="home-actions">

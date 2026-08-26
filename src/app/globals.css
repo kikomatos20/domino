@@ -547,6 +547,51 @@ body {
   opacity: 0.6;
 }
 
+/* ---------- who you are ---------- */
+
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 15px;
+  border-radius: 12px;
+  /* A bit of warmth against all that green. */
+  background: linear-gradient(120deg, rgba(212, 175, 55, 0.22), rgba(212, 175, 55, 0.05));
+  border: 1px solid rgba(212, 175, 55, 0.35);
+}
+
+.profile-avatar {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gold);
+  color: #1a1a1a;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.profile-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.profile-name {
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.profile-sub {
+  font-size: 0.78rem;
+  opacity: 0.7;
+}
+
 /* ---------- stats ---------- */
 
 .stats {
@@ -568,10 +613,27 @@ body {
   }
 }
 
+/* Each block gets its own accent so the page is not one flat green. */
 .stats-block {
   background: rgba(0, 0, 0, 0.2);
   border-radius: 10px;
+  border-top: 3px solid rgba(255, 255, 255, 0.14);
   padding: 11px 13px;
+}
+
+.stats-columns .stats-block:first-child {
+  border-top-color: #5ec4e8;
+  background: linear-gradient(180deg, rgba(94, 196, 232, 0.12), rgba(0, 0, 0, 0.2) 60%);
+}
+
+.stats-columns .stats-block:last-child {
+  border-top-color: #c9a0dc;
+  background: linear-gradient(180deg, rgba(201, 160, 220, 0.12), rgba(0, 0, 0, 0.2) 60%);
+}
+
+.stats > .stats-block {
+  border-top-color: var(--gold);
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.12), rgba(0, 0, 0, 0.2) 60%);
 }
 
 .stats-block h3 {
@@ -580,7 +642,7 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  opacity: 0.6;
+  opacity: 0.75;
 }
 
 .stats-list {

@@ -90,7 +90,23 @@ export async function accessToken(): Promise<string | null> {
   const db = browserClient();
   if (!db) return null;
   const { data } = await db.auth.getSession();
-  return data.session?.access_token ?? null;
+  const session = data.session;
+  if (!session) return null;
+
+  /**
+   * Refresh before sending, not after being refused.
+   *
+   * Access tokens are short-lived. The stored one can easily be stale by the
+   * time a page loads — which looks, from the outside, exactly like being
+   * signed out: the name still shows because that is read locally, while every
+   * request comes back 401.
+   */
+  const expiresAt = (session.expires_at ?? 0) * 1000;
+  if (expiresAt && expiresAt - Date.now() < 60_000) {
+    const { data: refreshed } = await db.auth.refreshSession();
+    return refreshed.session?.access_token ?? null;
+  }
+  return session.access_token;
 }
 
 export interface MatchResult {
