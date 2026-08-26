@@ -64,12 +64,19 @@ export async function signOut(): Promise<void> {
   await browserClient()?.auth.signOut();
 }
 
-/** Who is signed in, if anyone. */
+/**
+ * Who is signed in, if anyone.
+ *
+ * Reads the stored session rather than asking the server, so every page can
+ * show whether you are signed in without a round trip. Good enough to draw a
+ * badge with; anything that actually matters is verified server-side against
+ * the token, not against this.
+ */
 export async function currentAccount(): Promise<Account | null> {
   const db = browserClient();
   if (!db) return null;
-  const { data } = await db.auth.getUser();
-  return data.user ? readAccount(data.user) : null;
+  const { data } = await db.auth.getSession();
+  return data.session?.user ? readAccount(data.session.user) : null;
 }
 
 /**

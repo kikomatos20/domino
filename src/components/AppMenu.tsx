@@ -3,7 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { accountsAvailable, currentAccount, signOut, type Account } from "@/lib/auth";
+import {
+  accountsAvailable,
+  currentAccount,
+  onAccountChange,
+  signOut,
+  type Account,
+} from "@/lib/auth";
 
 /**
  * Getting anywhere from anywhere.
@@ -38,10 +44,13 @@ export default function AppMenu({
     setLeavingTo(href);
   };
 
+  // Know who you are from the moment the page loads, so the button itself can
+  // say whether you are signed in — and keep up if that changes in another tab.
   useEffect(() => {
-    if (!open || !accountsAvailable()) return;
+    if (!accountsAvailable()) return;
     currentAccount().then(setAccount);
-  }, [open]);
+    return onAccountChange(setAccount);
+  }, []);
 
   // Escape closes it, like every other dialog in the app.
   useEffect(() => {
@@ -56,12 +65,19 @@ export default function AppMenu({
   return (
     <>
       <button
-        className={`app-menu-button ${className}`}
+        className={`app-menu-button ${className} ${account ? "signed-in" : ""}`}
         onClick={() => setOpen(true)}
-        aria-label="Menu"
-        title="Menu"
+        aria-label={account ? `Menu — signed in as ${account.username}` : "Menu"}
+        title={account ? `Signed in as ${account.username}` : "Menu"}
       >
         ☰
+        {account && (
+          // The initial rather than a bare dot: at a glance it says *who*,
+          // which matters on a shared laptop.
+          <span className="app-menu-who" aria-hidden>
+            {account.username.slice(0, 1).toUpperCase()}
+          </span>
+        )}
       </button>
 
       {open && (

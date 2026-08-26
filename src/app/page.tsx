@@ -1,8 +1,10 @@
 import Link from "next/link";
+import AppMenu from "@/components/AppMenu";
 
 export default function Home() {
   return (
     <main className="home">
+      <AppMenu className="corner" />
       <div className="home-card">
         <h1>Dominoes</h1>
         <p className="home-sub">Partner dominoes, double six. First team to 100.</p>
