@@ -20,6 +20,7 @@ export default function CapicuaMoment({
   tileId,
   who,
   ends,
+  taunt,
   onDone,
 }: {
   tileId: TileId;
@@ -27,6 +28,8 @@ export default function CapicuaMoment({
   who: string;
   /** The two ends it closed on, which are what made it a capicúa. */
   ends: [number, number];
+  /** Whatever they said on the way down. */
+  taunt?: string;
   onDone: () => void;
 }) {
   const [leaving, setLeaving] = useState(false);
@@ -54,9 +57,19 @@ export default function CapicuaMoment({
         <DominoTile left={a} right={b} highlight />
       </div>
       <p className="capicua-word">¡Capicúa!</p>
-      <p className="capicua-detail">
-        {who} closed on the {ends[0]} and the {ends[1]}
-      </p>
+
+      {taunt ? (
+        <>
+          <p className="capicua-taunt">“{taunt}”</p>
+          <p className="capicua-detail">
+            — {who}, closing on the {ends[0]} and the {ends[1]}
+          </p>
+        </>
+      ) : (
+        <p className="capicua-detail">
+          {who} closed on the {ends[0]} and the {ends[1]}
+        </p>
+      )}
     </div>
   );
 }

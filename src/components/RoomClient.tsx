@@ -280,7 +280,9 @@ export default function RoomClient({ code }: { code: string }) {
       view={view}
       busy={busy}
       error={error}
-      onMove={(tileId: TileId, end: End) => send({ action: "move", tileId, end })}
+      onMove={(tileId: TileId, end: End, taunt?: string) =>
+        send({ action: "move", tileId, end, taunt })
+      }
       onPass={() => send({ action: "pass" })}
       fromStart={sawLobby.current}
       onReady={(ready: boolean) => send({ action: "ready", ready })}

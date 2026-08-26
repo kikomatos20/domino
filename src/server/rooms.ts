@@ -58,6 +58,8 @@ function seatOf(room: Room, token: string): Player | null {
 /** Keep the tail of the conversation; nobody scrolls back further than this. */
 const CHAT_LIMIT = 120;
 const MAX_CHAT_LENGTH = 240;
+/** A capicúa line: long enough to land, short enough to read at a glance. */
+const MAX_TAUNT = 60;
 
 /**
  * What to call whoever is in a seat.
@@ -436,7 +438,8 @@ export async function playMove(
   store: RoomStore,
   code: string,
   token: string,
-  move: Move
+  move: Move,
+  taunt?: string
 ): Promise<Room> {
   const room = await mustGet(store, code);
   const player = requirePlayer(room, token);
@@ -451,6 +454,15 @@ export async function playMove(
   }
 
   room.game = applyMove(game, player.seat, move);
+
+  // A line only survives if it was actually a capicúa. Anything else is just a
+  // player typing into the void, and it never reaches the other seats.
+  const line = (taunt ?? "").trim().slice(0, MAX_TAUNT);
+  if (line && room.game.roundOver?.capicua) {
+    room.game.roundOver.taunt = line;
+    say(room, { kind: "chat", seat: player.seat, who: player.nickname, text: line });
+  }
+
   say(room, {
     kind: "move",
     seat: player.seat,

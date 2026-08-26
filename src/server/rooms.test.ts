@@ -336,6 +336,68 @@ describe("disconnections", () => {
   });
 });
 
+describe("saying something on a capicua", () => {
+  /** A room whose next play by seat 0 closes on both ends. */
+  async function aboutToCapicua() {
+    const { code, tokens } = await fourPlayers();
+    await startMatch(store, code, tokens[0]);
+    const room = await get(code);
+    room.game = {
+      ...room.game!,
+      hands: [["3-5"], ["3-6"], ["2-2"], ["1-1"]],
+      line: [
+        { left: 3, right: 4, seat: 1 },
+        { left: 4, right: 5, seat: 2 },
+      ],
+      leftEnd: 3,
+      rightEnd: 5,
+      currentSeat: 0,
+      history: [],
+    };
+    await store.put(room);
+    return { code, tokens };
+  }
+
+  it("carries the line to everyone when the tile closes both ends", async () => {
+    const { code, tokens } = await aboutToCapicua();
+    await playMove(store, code, tokens[0], { tileId: "3-5", end: "right" }, "both ends, friend");
+
+    const view = viewFor(await get(code), tokens[1]);
+    expect(view.game!.roundOver).toMatchObject({ capicua: true, taunt: "both ends, friend" });
+    // And it lands in the chat, so it survives the moment passing.
+    expect(view.chat.some((c) => c.text === "both ends, friend")).toBe(true);
+  });
+
+  it("drops the line when the move was not a capicua", async () => {
+    const { code, tokens } = await fourPlayers();
+    await startMatch(store, code, tokens[0]);
+    const room = await get(code);
+    const seat = room.game!.currentSeat;
+    const player = room.players.find((p) => p.seat === seat)!;
+    const move = viewFor(room, player.token).game!.legalMoves[0];
+
+    await playMove(store, code, player.token, move, "nothing to see here");
+    const chat = (await get(code)).chat;
+    // A player typing into the void reaches nobody.
+    expect(chat.some((c) => c.text === "nothing to see here")).toBe(false);
+  });
+
+  it("keeps the line short enough to read", async () => {
+    const { code, tokens } = await aboutToCapicua();
+    await playMove(store, code, tokens[0], { tileId: "3-5", end: "right" }, "x".repeat(500));
+    const taunt = (await get(code)).game!.roundOver!.taunt!;
+    expect(taunt.length).toBeLessThanOrEqual(60);
+  });
+
+  it("says nothing at all when nothing was typed", async () => {
+    const { code, tokens } = await aboutToCapicua();
+    await playMove(store, code, tokens[0], { tileId: "3-5", end: "right" });
+    const over = (await get(code)).game!.roundOver!;
+    expect(over.capicua).toBe(true);
+    expect(over.taunt).toBeUndefined();
+  });
+});
+
 describe("swapping seats in the lobby", () => {
   async function two() {
     const { room, token } = await createRoom(store, { nickname: "Kiko" });

@@ -60,10 +60,16 @@ export async function POST(
         return NextResponse.json({ view: viewFor(room, token) });
       }
       case "move": {
-        const room = await playMove(store, code, token, {
-          tileId: String(body.tileId),
-          end: body.end === "left" ? "left" : "right",
-        });
+        const room = await playMove(
+          store,
+          code,
+          token,
+          {
+            tileId: String(body.tileId),
+            end: body.end === "left" ? "left" : "right",
+          },
+          typeof body.taunt === "string" ? body.taunt : undefined
+        );
         return NextResponse.json({ view: viewFor(room, token) });
       }
       case "pass": {

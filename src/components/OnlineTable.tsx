@@ -5,6 +5,7 @@ import type { End, GameState, Seat, TileId } from "@/engine/types";
 import type { PlayerView } from "@/server/types";
 import Board from "./Board";
 import CapicuaMoment from "./CapicuaMoment";
+import TauntPrompt from "./TauntPrompt";
 import { closingPlay } from "@/engine/engine";
 import type { EndAnchors } from "./Board";
 import DominoTile from "./DominoTile";
@@ -38,7 +39,7 @@ export default function OnlineTable({
   view: PlayerView;
   /** We watched this match begin, rather than opening the page onto it. */
   fromStart: boolean;
-  onMove: (tileId: TileId, end: End) => void;
+  onMove: (tileId: TileId, end: End, taunt?: string) => void;
   onPass: () => void;
   onReady: (ready: boolean) => void;
   onChat: (text: string) => void;
@@ -126,6 +127,27 @@ export default function OnlineTable({
   const [capicuaSeen, setCapicuaSeen] = useState(false);
   useEffect(() => setCapicuaSeen(false), [game.roundNumber]);
 
+  /**
+   * A move held back so its player can say something first.
+   *
+   * Only ever a capicúa — the last tile, fitting both ends. Everything else
+   * plays the instant it is dropped.
+   */
+  const [pending, setPending] = useState<{ tileId: TileId; end: End } | null>(null);
+
+  const play = (tileId: TileId, end: End) => {
+    const closesBothEnds =
+      game.hand.length === 1 &&
+      game.leftEnd !== null &&
+      game.rightEnd !== null &&
+      game.leftEnd !== game.rightEnd &&
+      tileId.split("-").map(Number).sort().join("-") ===
+        [game.leftEnd, game.rightEnd].sort((x, y) => x - y).join("-");
+
+    if (closesBothEnds) setPending({ tileId, end });
+    else onMove(tileId, end);
+  };
+
   const closing = game.roundOver?.capicua ? closingPlay(game.history) : null;
   const showCapicua = Boolean(closing) && !capicuaSeen && !replay.catchingUp;
 
@@ -204,15 +226,26 @@ export default function OnlineTable({
           ends={ends}
           yourTurn={myTurn}
           disabled={busy}
-          onPlay={onMove}
+          onPlay={play}
         />
       </div>
+
+      {pending && (
+        <TauntPrompt
+          onCancel={() => setPending(null)}
+          onPlay={(taunt) => {
+            onMove(pending.tileId, pending.end, taunt);
+            setPending(null);
+          }}
+        />
+      )}
 
       {showCapicua && closing && (
         <CapicuaMoment
           tileId={closing.tileId}
           who={seat(closing.seat).isYou ? "You" : seat(closing.seat).label}
           ends={closing.ends}
+          taunt={game.roundOver?.taunt}
           onDone={() => setCapicuaSeen(true)}
         />
       )}

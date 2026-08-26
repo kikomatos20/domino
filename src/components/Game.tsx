@@ -5,6 +5,7 @@ import {
   applyMove,
   applyPass,
   closingPlay,
+  isCapicua,
   legalMoves,
   matchWinner,
   mustPass,
@@ -23,6 +24,7 @@ import ReviewPanel from "./ReviewPanel";
 import Board from "./Board";
 import type { EndAnchors } from "./Board";
 import CapicuaMoment from "./CapicuaMoment";
+import TauntPrompt, { MAX_TAUNT } from "./TauntPrompt";
 
 const SEAT_NAMES: Record<Seat, string> = { 0: "You", 1: "East", 2: "Partner", 3: "West" };
 /** Long enough to watch each computer play land and read who played what. */
@@ -95,15 +97,38 @@ export default function Game() {
   }, [banner]);
 
 
-  const playHuman = useCallback((tileId: TileId, end: End) => {
+  const playHuman = useCallback((tileId: TileId, end: End, taunt?: string) => {
     setState((s) => {
       if (!s) return s;
       const move = legalMoves(s, HUMAN).find(
         (m) => m.tileId === tileId && m.end === end
       );
-      return move ? applyMove(s, HUMAN, move) : s;
+      if (!move) return s;
+      const next = applyMove(s, HUMAN, move);
+      const line = (taunt ?? "").trim().slice(0, MAX_TAUNT);
+      if (line && next.roundOver?.capicua) next.roundOver.taunt = line;
+      return next;
     });
   }, []);
+
+  /** Held back so a capicúa can be announced before it lands. */
+  const [pending, setPending] = useState<{ tileId: TileId; end: End } | null>(null);
+
+  const offerPlay = useCallback(
+    (tileId: TileId, end: End) => {
+      if (!state) return;
+      const closesBothEnds =
+        state.hands[HUMAN].length === 1 &&
+        state.leftEnd !== null &&
+        state.rightEnd !== null &&
+        state.leftEnd !== state.rightEnd &&
+        isCapicua(state, { tileId, end });
+
+      if (closesBothEnds) setPending({ tileId, end });
+      else playHuman(tileId, end);
+    },
+    [state, playHuman]
+  );
 
   if (!state) {
     return <main className="table-root loading">Setting up the table…</main>;
@@ -184,15 +209,26 @@ export default function Game() {
           legalMoves={myMoves}
           ends={ends}
           yourTurn={humanTurn}
-          onPlay={playHuman}
+          onPlay={offerPlay}
         />
       </div>
+
+      {pending && (
+        <TauntPrompt
+          onCancel={() => setPending(null)}
+          onPlay={(taunt) => {
+            playHuman(pending.tileId, pending.end, taunt);
+            setPending(null);
+          }}
+        />
+      )}
 
       {showCapicua && closing && (
         <CapicuaMoment
           tileId={closing.tileId}
           who={SEAT_NAMES[closing.seat]}
           ends={closing.ends}
+          taunt={state.roundOver?.taunt}
           onDone={() => setCapicuaRound(state.roundNumber)}
         />
       )}

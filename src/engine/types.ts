@@ -43,6 +43,14 @@ export interface RoundResult {
    * announced, nothing more.
    */
   capicua?: boolean;
+  /**
+   * Something the winner said as they laid the capicúa down.
+   *
+   * Presentation rather than rules — the engine never reads it. It rides on the
+   * result because that is what already travels to every player and into the
+   * round history, so it needs no storage of its own.
+   */
+  taunt?: string;
 }
 
 export interface LastAction {
