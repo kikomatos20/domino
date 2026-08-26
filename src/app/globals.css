@@ -474,10 +474,15 @@ body {
   z-index: 40;
 }
 
+/* The menu belongs to the game, not to the browser: felt green rather than a
+   white box, with the same gold the table uses. */
 .dialog.app-menu {
   text-align: left;
   gap: 7px;
   min-width: min(300px, 86vw);
+  background: linear-gradient(160deg, #12452c, #0b2f1e);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  color: #f4f1e8;
 }
 
 .app-menu-head {
@@ -489,56 +494,92 @@ body {
 
 .dialog.app-menu h2 {
   margin: 0;
+  color: var(--gold);
 }
 
 .app-menu-close {
   flex: none;
-  background: none;
-  border: none;
-  font-size: 1.5rem;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  font-size: 1.2rem;
   line-height: 1;
   cursor: pointer;
-  color: inherit;
-  opacity: 0.45;
-  padding: 0 4px;
+  color: #f4f1e8;
+  opacity: 0.7;
+  padding: 0;
 }
 
 .app-menu-close:hover {
   opacity: 1;
+  background: rgba(255, 255, 255, 0.16);
 }
 
-/* Proper buttons. The dialog is light, so these cannot borrow .home-button —
-   its white text disappears against this background. */
+/* Each destination carries its own colour, matching the stats page. */
 .app-menu-item {
-  display: block;
+  --accent: var(--gold);
+  display: flex;
+  align-items: center;
+  gap: 11px;
   width: 100%;
   text-align: left;
   text-decoration: none;
   font: inherit;
   font-size: 0.95rem;
   font-weight: 600;
-  color: inherit;
-  background: rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  color: #f4f1e8;
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--accent) 26%, transparent),
+    rgba(255, 255, 255, 0.05)
+  );
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-left: 4px solid var(--accent);
   border-radius: 9px;
   padding: 11px 14px;
   cursor: pointer;
+  transition: transform 90ms ease, background 120ms ease;
 }
 
 .app-menu-item:hover {
-  background: rgba(0, 0, 0, 0.09);
+  transform: translateX(2px);
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--accent) 40%, transparent),
+    rgba(255, 255, 255, 0.09)
+  );
+}
+
+.app-menu-item.gold { --accent: #d4af37; }
+.app-menu-item.violet { --accent: #c9a0dc; }
+.app-menu-item.sky { --accent: #5ec4e8; }
+.app-menu-item.leaf { --accent: #7fd6a0; }
+
+.app-menu-glyph {
+  flex: none;
+  width: 22px;
+  text-align: center;
+  font-size: 1.05rem;
+  color: var(--accent);
 }
 
 .app-menu-item.quiet {
   background: none;
   border-color: transparent;
-  opacity: 0.65;
+  border-left-color: transparent;
+  opacity: 0.6;
   font-weight: 500;
 }
 
 .app-menu-item.quiet:hover {
   opacity: 1;
-  background: rgba(0, 0, 0, 0.05);
+  transform: none;
+  background: rgba(255, 255, 255, 0.07);
 }
 
 .app-menu-note {

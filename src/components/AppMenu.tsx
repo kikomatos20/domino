@@ -18,6 +18,9 @@ import {
  * started the only route home was the browser's back button. This is one small
  * button that opens the same short list everywhere.
  */
+/** href, label, accent colour, and a glyph to carry it. */
+type Item = [string, string, string, string];
+
 export default function AppMenu({
   className = "",
   /** A match is in progress, so walking away is worth asking about. */
@@ -94,26 +97,30 @@ export default function AppMenu({
               </button>
             </header>
 
+            {/* Accents match the stats page: purple for the computer, blue for
+                people, gold for you. */}
             {([
-              ["/", "Home"],
-              ["/solo", "Play vs Computer"],
-              ["/online", "Play with Friends"],
+              ["/", "Home", "gold", "🁣"],
+              ["/solo", "Play vs Computer", "violet", "🖳"],
+              ["/online", "Play with Friends", "sky", "🀱"],
               ...(accountsAvailable()
-                ? ([[
-                    "/account",
-                    account ? "Your record" : "Sign in",
-                  ]] as [string, string][])
+                ? ([
+                    ["/account", account ? "Your record" : "Sign in", "leaf", "★"],
+                  ] as Item[])
                 : []),
-            ] as [string, string][]).map(([href, label]) => (
+            ] as Item[]).map(([href, label, accent, glyph]) => (
               <Link
                 key={href}
-                className="app-menu-item"
+                className={`app-menu-item ${accent}`}
                 href={href}
                 onClick={(e) => {
                   go(href)(e);
                   if (!inGame) setOpen(false);
                 }}
               >
+                <span className="app-menu-glyph" aria-hidden>
+                  {glyph}
+                </span>
                 {label}
               </Link>
             ))}
