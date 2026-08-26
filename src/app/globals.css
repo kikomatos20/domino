@@ -34,15 +34,17 @@ body {
     "west board east chat"
     "hand hand hand chat";
   grid-template-rows: auto auto 1fr auto;
-  grid-template-columns: 90px 1fr 90px 290px;
+  /* No chat column by default, so the solo table stays centred. The area is
+     still named, so the collapsed bar has somewhere to sit. */
+  grid-template-columns: 90px 1fr 90px 0;
   height: 100dvh;
   padding: 8px;
   gap: 6px;
 }
 
-/* Closed: the column collapses and the board takes the space back. */
-.table-root.chat-hidden {
-  grid-template-columns: 90px 1fr 90px 0;
+/* Only an open chat takes space off the board. */
+.table-root.with-chat {
+  grid-template-columns: 90px 1fr 90px 290px;
 }
 
 .table-root.loading {
@@ -1653,7 +1655,9 @@ body {
     padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px));
   }
 
-  .table-root.chat-hidden {
+  /* The chat row is content-sized, so it is simply absent in solo play and
+     just tall enough for the bar when the chat is collapsed. */
+  .table-root.with-chat {
     grid-template-columns: 34px 1fr 34px;
   }
 

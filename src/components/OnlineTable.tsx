@@ -115,7 +115,7 @@ export default function OnlineTable({
     : null;
 
   return (
-    <main className={`table-root ${chatOpen ? "" : "chat-hidden"}`}>
+    <main className={`table-root ${chatOpen ? "with-chat" : ""}`}>
       <header className="scoreboard">
         <div className="score us">
           <span className="label">Us</span>
