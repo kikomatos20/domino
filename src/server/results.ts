@@ -64,6 +64,9 @@ export async function recordMatch(room: Room, game: GameState): Promise<void> {
         opponent_score: game.matchScore[1 - team],
         rounds: game.roundNumber,
         partner_name: partner?.nickname ?? "Computer",
+        // Who actually sat down. A room full of computers is a solo game with
+        // a room code, and must not count as a win against people.
+        humans: room.players.length,
       };
     });
 
@@ -90,6 +93,7 @@ export async function recordSolo(
     opponent_score: result.opponentScore,
     rounds: result.rounds,
     partner_name: "Computer",
+    humans: 1,
   });
 }
 
@@ -133,6 +137,18 @@ export interface Stats {
   partners: PartnerRecord[];
   onlineRounds: RoundTotals;
   soloRounds: RoundTotals;
+}
+
+/**
+ * Did this game have anyone else in it?
+ *
+ * Not the same question as "was there a room code". Opening a private room and
+ * letting the computer fill the other three seats is a solo game wearing a room
+ * code, and counting those as wins against people would make the record
+ * meaningless — you could farm it against the easy computer.
+ */
+export function againstPeople(row: { humans?: number | null }): boolean {
+  return (row.humans ?? 1) >= 2;
 }
 
 /** Wins, losses and streaks over a set of matches, newest first. */
@@ -237,14 +253,14 @@ export async function statsFor(userId: string): Promise<Stats> {
   const [matches, rounds] = await Promise.all([
     db
       .from("match_results")
-      .select("won, team_score, opponent_score, room_code, partner_name")
+      .select("won, team_score, opponent_score, room_code, partner_name, humans")
       .eq("user_id", userId)
       .order("finished_at", { ascending: false })
       .limit(500),
     db
       .from("round_stats")
       .select(
-        "won, capicua, dominoed, closed, closed_won, passes, pips_left, accuracy, engine_agreement, team_play, room_code, finished_at"
+        "won, capicua, dominoed, closed, closed_won, passes, pips_left, accuracy, engine_agreement, team_play, room_code, humans, finished_at"
       )
       .eq("user_id", userId)
       .order("finished_at", { ascending: false })
@@ -252,10 +268,13 @@ export async function statsFor(userId: string): Promise<Stats> {
   ]);
 
   const matchRows = matches.data ?? [];
-  const roundRows = (rounds.data ?? []) as (RoundRow & { room_code: string | null })[];
+  const roundRows = (rounds.data ?? []) as (RoundRow & {
+    room_code: string | null;
+    humans: number | null;
+  })[];
 
-  const onlineMatches = matchRows.filter((r) => r.room_code !== null);
-  const soloMatches = matchRows.filter((r) => r.room_code === null);
+  const onlineMatches = matchRows.filter(againstPeople);
+  const soloMatches = matchRows.filter((r) => !againstPeople(r));
 
   // Who you win with. Computers are not partners worth ranking.
   const byPartner = new Map<string, { played: number; won: number }>();
@@ -274,8 +293,8 @@ export async function statsFor(userId: string): Promise<Stats> {
     partners: [...byPartner.entries()]
       .map(([name, v]) => ({ name, ...v }))
       .sort((a, b) => b.played - a.played),
-    onlineRounds: totals(roundRows.filter((r) => r.room_code !== null)),
-    soloRounds: totals(roundRows.filter((r) => r.room_code === null)),
+    onlineRounds: totals(roundRows.filter(againstPeople)),
+    soloRounds: totals(roundRows.filter((r) => !againstPeople(r))),
   };
 }
 
@@ -286,7 +305,7 @@ export async function recordFor(userId: string): Promise<PlayRecord> {
 
   const { data, error } = await db
     .from("match_results")
-    .select("won, team_score, opponent_score, rounds, room_code, partner_name, finished_at")
+    .select("won, team_score, opponent_score, rounds, room_code, partner_name, humans, finished_at")
     .eq("user_id", userId)
     .order("finished_at", { ascending: false })
     .limit(50);
@@ -300,7 +319,7 @@ export async function recordFor(userId: string): Promise<PlayRecord> {
     rounds: r.rounds,
     roomCode: r.room_code,
     partnerName: r.partner_name,
-    solo: r.room_code === null,
+    solo: (r.humans ?? 1) < 2,
     finishedAt: r.finished_at,
   }));
 

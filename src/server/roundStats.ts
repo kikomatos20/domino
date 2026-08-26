@@ -27,10 +27,11 @@ function admin(): SupabaseClient | null {
   return client;
 }
 
-function row(userId: string, roomCode: string | null, stat: RoundStat) {
+function row(userId: string, roomCode: string | null, stat: RoundStat, humans: number) {
   return {
     user_id: userId,
     room_code: roomCode,
+    humans,
     round_number: stat.roundNumber,
     seat: stat.seat,
     role_at_start: stat.roleAtStart,
@@ -66,7 +67,7 @@ export async function recordRound(room: Room, game: GameState): Promise<void> {
     .filter((p) => p.userId)
     .map((p) => {
       const stat = statsFor(game, p.seat);
-      return stat ? row(p.userId as string, room.code, stat) : null;
+      return stat ? row(p.userId as string, room.code, stat, room.players.length) : null;
     })
     .filter((r): r is ReturnType<typeof row> => r !== null);
 
@@ -82,5 +83,5 @@ export async function recordRound(room: Room, game: GameState): Promise<void> {
 export async function recordSoloRound(userId: string, stat: RoundStat): Promise<void> {
   const db = admin();
   if (!db) return;
-  await db.from("round_stats").insert(row(userId, null, stat));
+  await db.from("round_stats").insert(row(userId, null, stat, 1));
 }
