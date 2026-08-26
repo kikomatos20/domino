@@ -83,55 +83,44 @@ export default function AppMenu({
       {open && (
         <div className="overlay" onClick={() => setOpen(false)}>
           <nav className="dialog app-menu" onClick={(e) => e.stopPropagation()}>
-            <h2>{account ? account.username : "Domino"}</h2>
+            <header className="app-menu-head">
+              <h2>{account ? account.username : "Domino"}</h2>
+              <button
+                className="app-menu-close"
+                onClick={() => setOpen(false)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </header>
 
-            <Link
-              className="home-button"
-              href="/"
-              onClick={(e) => {
-                go("/")(e);
-                if (!inGame) setOpen(false);
-              }}
-            >
-              Home
-            </Link>
-            <Link
-              className="home-button"
-              href="/solo"
-              onClick={(e) => {
-                go("/solo")(e);
-                if (!inGame) setOpen(false);
-              }}
-            >
-              Play vs Computer
-            </Link>
-            <Link
-              className="home-button"
-              href="/online"
-              onClick={(e) => {
-                go("/online")(e);
-                if (!inGame) setOpen(false);
-              }}
-            >
-              Play with Friends
-            </Link>
-
-            {accountsAvailable() && (
+            {([
+              ["/", "Home"],
+              ["/solo", "Play vs Computer"],
+              ["/online", "Play with Friends"],
+              ...(accountsAvailable()
+                ? ([[
+                    "/account",
+                    account ? "Your record" : "Sign in",
+                  ]] as [string, string][])
+                : []),
+            ] as [string, string][]).map(([href, label]) => (
               <Link
-                className="home-button"
-                href="/account"
+                key={href}
+                className="app-menu-item"
+                href={href}
                 onClick={(e) => {
-                  go("/account")(e);
+                  go(href)(e);
                   if (!inGame) setOpen(false);
                 }}
               >
-                {account ? "Your record" : "Sign in"}
+                {label}
               </Link>
-            )}
+            ))}
 
             {account && (
               <button
-                className="link"
+                className="app-menu-item quiet"
                 onClick={async () => {
                   await signOut();
                   setAccount(null);
@@ -141,13 +130,12 @@ export default function AppMenu({
               </button>
             )}
 
-            <button className="link" onClick={() => setOpen(false)}>
-              Back to the game
-            </button>
-
-            <p className="home-note">
-              Your seat is kept if you come back to the same room code.
-            </p>
+            {/* Only true if there is actually a table to go back to. */}
+            {inGame && (
+              <p className="app-menu-note">
+                Your seat is kept if you come back to the same room code.
+              </p>
+            )}
           </nav>
         </div>
       )}

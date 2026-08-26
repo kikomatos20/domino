@@ -476,11 +476,75 @@ body {
 
 .dialog.app-menu {
   text-align: left;
-  gap: 8px;
+  gap: 7px;
+  min-width: min(300px, 86vw);
+}
+
+.app-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .dialog.app-menu h2 {
-  margin-bottom: 2px;
+  margin: 0;
+}
+
+.app-menu-close {
+  flex: none;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.45;
+  padding: 0 4px;
+}
+
+.app-menu-close:hover {
+  opacity: 1;
+}
+
+/* Proper buttons. The dialog is light, so these cannot borrow .home-button —
+   its white text disappears against this background. */
+.app-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  text-decoration: none;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: inherit;
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 9px;
+  padding: 11px 14px;
+  cursor: pointer;
+}
+
+.app-menu-item:hover {
+  background: rgba(0, 0, 0, 0.09);
+}
+
+.app-menu-item.quiet {
+  background: none;
+  border-color: transparent;
+  opacity: 0.65;
+  font-weight: 500;
+}
+
+.app-menu-item.quiet:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.app-menu-note {
+  margin: 2px 0 0;
+  font-size: 0.76rem;
+  opacity: 0.6;
 }
 
 /* ---------- stats ---------- */
