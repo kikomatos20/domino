@@ -86,6 +86,63 @@ export async function accessToken(): Promise<string | null> {
   return data.session?.access_token ?? null;
 }
 
+export interface MatchResult {
+  won: boolean;
+  teamScore: number;
+  opponentScore: number;
+  rounds: number;
+  roomCode: string | null;
+  partnerName: string | null;
+  solo: boolean;
+  finishedAt: string;
+}
+
+export interface PlayRecord {
+  played: number;
+  won: number;
+  lost: number;
+  recent: MatchResult[];
+}
+
+async function authHeaders(): Promise<Record<string, string> | null> {
+  const token = await accessToken();
+  return token ? { authorization: `Bearer ${token}` } : null;
+}
+
+/** Your own wins and losses. Null when nobody is signed in. */
+export async function fetchRecord(): Promise<PlayRecord | null> {
+  const headers = await authHeaders();
+  if (!headers) return null;
+  const response = await fetch("/api/results", { headers, cache: "no-store" });
+  if (!response.ok) return null;
+  const body = await response.json();
+  return body.record ?? null;
+}
+
+/**
+ * Report a finished solo match.
+ *
+ * Silent on failure: losing a record is not worth an error message in the face
+ * of someone who has just finished a game.
+ */
+export async function reportSolo(result: {
+  teamScore: number;
+  opponentScore: number;
+  rounds: number;
+}): Promise<void> {
+  try {
+    const headers = await authHeaders();
+    if (!headers) return;
+    await fetch("/api/results", {
+      method: "POST",
+      headers: { ...headers, "content-type": "application/json" },
+      body: JSON.stringify(result),
+    });
+  } catch {
+    // Nothing to do about it, and nothing worth saying.
+  }
+}
+
 /** React to signing in or out anywhere in the app. */
 export function onAccountChange(handler: (account: Account | null) => void): () => void {
   const db = browserClient();

@@ -336,6 +336,45 @@ describe("disconnections", () => {
   });
 });
 
+describe("accounts at the table", () => {
+  it("remembers which seats belong to an account and which are guests", async () => {
+    const { room } = await createRoom(store, { nickname: "Kiko", userId: "user-kiko" });
+    await joinRoom(store, room.code, "Ana", undefined, "user-ana");
+    await joinRoom(store, room.code, "Guest");
+
+    const after = await get(room.code);
+    const by = (name: string) => after.players.find((p) => p.nickname === name)!;
+    expect(by("Kiko").userId).toBe("user-kiko");
+    expect(by("Ana").userId).toBe("user-ana");
+    // A nickname-only player is exactly as welcome, and simply not recorded.
+    expect(by("Guest").userId ?? null).toBeNull();
+  });
+
+  it("keeps the account attached to the person when seats move", async () => {
+    const { room, token } = await createRoom(store, { nickname: "Kiko", userId: "user-kiko" });
+    const ana = (await joinRoom(store, room.code, "Ana", undefined, "user-ana")).token;
+
+    await requestSwap(store, room.code, token, 1);
+    await respondSwap(store, room.code, ana, true);
+
+    const after = await get(room.code);
+    // They changed chairs, not identities.
+    expect(after.players.find((p) => p.token === token)!.userId).toBe("user-kiko");
+    expect(after.players.find((p) => p.token === ana)!.userId).toBe("user-ana");
+  });
+
+  it("never exposes an account id to the other players", async () => {
+    const { room, token } = await createRoom(store, { nickname: "Kiko", userId: "user-kiko" });
+    const ana = (await joinRoom(store, room.code, "Ana", undefined, "user-ana")).token;
+
+    // Whole payload, not just the fields we happen to read.
+    const raw = JSON.stringify(viewFor(await get(room.code), ana));
+    expect(raw).not.toContain("user-kiko");
+    expect(raw).not.toContain("user-ana");
+    void token;
+  });
+});
+
 describe("saying something on a capicua", () => {
   /** A room whose next play by seat 0 closes on both ends. */
   async function aboutToCapicua() {

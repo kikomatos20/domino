@@ -17,6 +17,18 @@ export function tokenFrom(request: Request): string | null {
   return request.headers.get("x-player-token");
 }
 
+/**
+ * The account session, if the browser sent one.
+ *
+ * Separate from the player token on purpose: the seat token is what runs the
+ * game, and this only decides whether the result is written down. Ordinary play
+ * never needs to verify it.
+ */
+export function bearer(request: Request): string | null {
+  const header = request.headers.get("authorization") ?? "";
+  return header.startsWith("Bearer ") ? header.slice(7) : null;
+}
+
 export function requireToken(request: Request): string {
   const token = tokenFrom(request);
   if (!token) throw new RoomError("Missing player token", 401);

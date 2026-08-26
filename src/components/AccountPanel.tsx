@@ -5,10 +5,12 @@ import Link from "next/link";
 import {
   accountsAvailable,
   currentAccount,
+  fetchRecord,
   signIn,
   signOut,
   signUp,
   type Account,
+  type PlayRecord,
 } from "@/lib/auth";
 
 /**
@@ -26,12 +28,22 @@ export default function AccountPanel() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [record, setRecord] = useState<PlayRecord | null>(null);
 
   useEffect(() => {
     currentAccount()
       .then(setAccount)
       .finally(() => setLoading(false));
   }, []);
+
+  // Load the record whenever there is somebody to load it for.
+  useEffect(() => {
+    if (!account) {
+      setRecord(null);
+      return;
+    }
+    fetchRecord().then(setRecord);
+  }, [account]);
 
   const submit = async () => {
     setBusy(true);
@@ -71,9 +83,44 @@ export default function AccountPanel() {
           <p className="home-sub">One moment…</p>
         ) : account ? (
           <>
-            <p className="home-sub">
-              Signed in. Match results will be saved to this name.
-            </p>
+            {record ? (
+              <>
+                <div className="record-tally">
+                  <span className="record-win">{record.won} W</span>
+                  <span className="record-loss">{record.lost} L</span>
+                  {record.played > 0 && (
+                    <span className="record-rate">
+                      {Math.round((record.won / record.played) * 100)}%
+                    </span>
+                  )}
+                </div>
+
+                {record.played === 0 ? (
+                  <p className="home-sub">
+                    Nothing yet. Finish a match to a hundred and it lands here.
+                  </p>
+                ) : (
+                  <ul className="record-list">
+                    {record.recent.map((m, i) => (
+                      <li key={i} className={`record-row ${m.won ? "won" : "lost"}`}>
+                        <span className="record-verdict">{m.won ? "Won" : "Lost"}</span>
+                        <span className="record-score">
+                          {m.teamScore}–{m.opponentScore}
+                        </span>
+                        <span className="record-where">
+                          {m.solo ? "vs computer" : `with ${m.partnerName ?? "a partner"}`}
+                        </span>
+                        <span className="record-rounds">
+                          {m.rounds} round{m.rounds === 1 ? "" : "s"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            ) : (
+              <p className="home-sub">Signed in. Match results are saved to this name.</p>
+            )}
             <div className="home-actions">
               <Link className="home-button primary" href="/online">
                 Play

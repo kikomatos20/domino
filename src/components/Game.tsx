@@ -25,6 +25,7 @@ import Board from "./Board";
 import type { EndAnchors } from "./Board";
 import CapicuaMoment from "./CapicuaMoment";
 import TauntPrompt, { MAX_TAUNT } from "./TauntPrompt";
+import { reportSolo } from "@/lib/auth";
 
 const SEAT_NAMES: Record<Seat, string> = { 0: "You", 1: "East", 2: "Partner", 3: "West" };
 /** Long enough to watch each computer play land and read who played what. */
@@ -83,6 +84,21 @@ export default function Game() {
     }, 1400);
     return () => clearTimeout(t);
   }, [state]);
+
+  /**
+   * Report a finished solo match, once.
+   *
+   * Solo runs entirely here, so this browser is the only thing that knows the
+   * match ended. Guests report nothing and never notice the difference.
+   */
+  const reported = useRef(false);
+  useEffect(() => {
+    if (!state?.matchOver || reported.current) return;
+    reported.current = true;
+    const us = state.matchScore[0];
+    const them = state.matchScore[1];
+    reportSolo({ teamScore: us, opponentScore: them, rounds: state.roundNumber });
+  }, [state?.matchOver, state?.matchScore, state?.roundNumber]);
 
   // Keep the finished round's history available for review.
   useEffect(() => {

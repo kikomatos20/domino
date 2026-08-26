@@ -37,6 +37,23 @@ async function parse(response: Response) {
   return body;
 }
 
+/**
+ * Add the account session, if there is one.
+ *
+ * Only sent when taking a seat — it decides whether results get written down,
+ * not whether the game works. Play as a guest and everything is identical
+ * except that nothing is kept.
+ */
+async function withSession(headers: Record<string, string>): Promise<Record<string, string>> {
+  try {
+    const { accessToken } = await import("./auth");
+    const token = await accessToken();
+    return token ? { ...headers, authorization: `Bearer ${token}` } : headers;
+  } catch {
+    return headers;
+  }
+}
+
 export async function createRoom(opts: {
   nickname: string;
   fillWithAi: boolean;
@@ -45,7 +62,7 @@ export async function createRoom(opts: {
   const body = await parse(
     await fetch("/api/rooms", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: await withSession({ "content-type": "application/json" }),
       body: JSON.stringify(opts),
     })
   );
@@ -60,7 +77,7 @@ export async function joinRoom(
   const body = await parse(
     await fetch(`/api/rooms/${encodeURIComponent(code)}/join`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: await withSession({ "content-type": "application/json" }),
       body: JSON.stringify({ nickname }),
     })
   );

@@ -19,6 +19,12 @@ export interface Player {
    * At most one at a time, and cleared whenever the seats actually move.
    */
   wantsSeat: Seat | null;
+  /**
+   * The account behind this seat, if they were signed in when they sat down.
+   * Null for guests, which stays the normal case — an account only decides
+   * whether the result gets written down.
+   */
+  userId?: string | null;
 }
 
 /**

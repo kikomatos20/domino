@@ -424,6 +424,75 @@ body {
   text-decoration: underline;
 }
 
+/* ---------- your record ---------- */
+
+.record-tally {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 16px;
+  margin: 4px 0 10px;
+  font-size: 1.6rem;
+  font-weight: 800;
+}
+
+.record-win {
+  color: #7fd6a0;
+}
+
+.record-loss {
+  color: #e08b8b;
+}
+
+.record-rate {
+  font-size: 0.95rem;
+  font-weight: 600;
+  opacity: 0.6;
+}
+
+.record-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 340px;
+  overflow-y: auto;
+  text-align: left;
+}
+
+.record-row {
+  display: grid;
+  grid-template-columns: 46px 62px 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  background: rgba(0, 0, 0, 0.22);
+  border-left: 3px solid #e08b8b;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 0.82rem;
+}
+
+.record-row.won {
+  border-left-color: #7fd6a0;
+}
+
+.record-verdict {
+  font-weight: 700;
+}
+
+.record-score {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+}
+
+.record-where,
+.record-rounds {
+  opacity: 0.6;
+  font-size: 0.76rem;
+}
+
 /* ---------- capicúa ---------- */
 
 .capicua {

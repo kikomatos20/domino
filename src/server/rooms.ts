@@ -18,6 +18,7 @@ import {
 } from "@/engine/engine";
 import { chooseMove } from "@/engine/ai";
 import { manoAt } from "@/engine/roles";
+import { recordMatch } from "./results";
 import type { Difficulty } from "@/engine/ai";
 import type { GameState, Move, Seat, TileId } from "@/engine/types";
 import { RoomError } from "./types";
@@ -154,6 +155,8 @@ export interface CreateOptions {
   difficulty?: Difficulty;
   target?: number;
   random?: () => number;
+  /** The account opening the table, if they were signed in. */
+  userId?: string | null;
 }
 
 export async function createRoom(
@@ -185,6 +188,7 @@ export async function createRoom(
         lastSeen: Date.now(),
         ready: false,
         wantsSeat: null,
+        userId: opts.userId ?? null,
       },
     ],
     chat: [],
@@ -200,7 +204,8 @@ export async function joinRoom(
   store: RoomStore,
   code: string,
   nickname: string,
-  random: () => number = Math.random
+  random: () => number = Math.random,
+  userId: string | null = null
 ): Promise<{ room: Room; token: string }> {
   const room = await mustGet(store, code);
   if (room.status !== "lobby") throw new RoomError("That game has already started", 409);
@@ -218,6 +223,7 @@ export async function joinRoom(
     lastSeen: Date.now(),
     ready: false,
     wantsSeat: null,
+    userId,
   });
   say(room, { kind: "event", seat: open[0], who: "", text: `${name} sat down` });
   await save(store, room);
@@ -617,7 +623,12 @@ async function advanceAi(room: Room): Promise<void> {
   }
 
   room.game = game;
-  if (game.matchOver) room.status = "finished";
+  // Write the result down once, on the transition — every later call sees a
+  // room that is already finished and does nothing.
+  if (game.matchOver && room.status !== "finished") {
+    room.status = "finished";
+    await recordMatch(room, game);
+  }
 }
 
 // ---------------------------------------------------------------- views
