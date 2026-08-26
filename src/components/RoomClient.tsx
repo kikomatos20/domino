@@ -7,10 +7,14 @@ import type { PlayerView } from "@/server/types";
 import type { End, Seat, TileId } from "@/engine/types";
 import Lobby from "./Lobby";
 import OnlineTable from "./OnlineTable";
+import type { RoomChannel } from "@/lib/realtime";
+import { pollDelay } from "@/lib/pollSchedule";
 
-/** How often to re-read the room. Realtime pings shorten this in practice. */
-const POLL_MS = 1500;
-const PING_MS = 20000;
+/**
+ * Presence. Slower than it was: with changes arriving over the websocket, the
+ * heartbeat is otherwise the noisiest thing left.
+ */
+const PING_MS = 30000;
 
 export default function RoomClient({ code }: { code: string }) {
   const [view, setView] = useState<PlayerView | null>(null);
@@ -22,6 +26,11 @@ export default function RoomClient({ code }: { code: string }) {
 
   const misses = useRef(0);
   const inFlight = useRef(false);
+  /** When the room last actually moved, so an idle table can stop asking. */
+  const lastChange = useRef(Date.now());
+  /** Whether the websocket is carrying changes for us. */
+  const live = useRef(false);
+  const resting = useRef(false);
 
   const refresh = useCallback(async () => {
     // Never poll over the top of our own action — the reply to that is newer
@@ -36,6 +45,8 @@ export default function RoomClient({ code }: { code: string }) {
       setView((current) => {
         if (current && next.version <= version.current) return current;
         version.current = next.version;
+        lastChange.current = Date.now();
+        resting.current = Boolean(next.game?.roundOver) || next.status === "finished";
         return next;
       });
     } catch (e) {
@@ -52,8 +63,85 @@ export default function RoomClient({ code }: { code: string }) {
   useEffect(() => {
     setNickname(savedNickname());
     refresh();
-    const poll = setInterval(refresh, POLL_MS);
-    return () => clearInterval(poll);
+  }, [refresh]);
+
+  /**
+   * Changes arrive over the websocket; this timer only catches what it missed.
+   * It reschedules itself each time so the gap can stretch while the table is
+   * idle and tighten the moment the socket drops.
+   */
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    let stopped = false;
+
+    const tick = async () => {
+      await refresh();
+      if (stopped) return;
+      timer = setTimeout(
+        tick,
+        pollDelay({
+          live: live.current,
+          sinceChange: Date.now() - lastChange.current,
+          resting: resting.current,
+        })
+      );
+    };
+
+    timer = setTimeout(tick, pollDelay({ live: live.current, sinceChange: 0 }));
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+    };
+  }, [refresh]);
+
+  /**
+   * The websocket: a change reaches us the moment it happens, without costing
+   * a request. If it is not configured or drops, the timer above takes over.
+   *
+   * Loaded on demand — the Supabase client is 65 kB, and the table should be on
+   * screen before we spend that. Until it arrives we are simply polling, which
+   * is the same thing the app did before any of this existed.
+   */
+  useEffect(() => {
+    let channel: RoomChannel | null = null;
+    let cancelled = false;
+
+    import("@/lib/realtime").then(({ watchRoom }) => {
+      if (cancelled) return;
+      channel = watchRoom(
+        code,
+        (broadcastVersion) => {
+          // Only bother fetching if they know something we do not.
+          if (broadcastVersion > version.current) {
+            lastChange.current = Date.now();
+            refresh();
+          }
+        },
+        (isLive) => {
+          live.current = isLive;
+          // Coming back from a drop: re-sync at once rather than waiting.
+          if (isLive) refresh();
+        }
+      );
+    });
+
+    return () => {
+      cancelled = true;
+      channel?.close();
+    };
+  }, [code, refresh]);
+
+  // Phones suspend background tabs, so a returning player can be far behind.
+  useEffect(() => {
+    const wake = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", wake);
+    window.addEventListener("online", refresh);
+    return () => {
+      document.removeEventListener("visibilitychange", wake);
+      window.removeEventListener("online", refresh);
+    };
   }, [refresh]);
 
   // Tell the table we are still here, so our seat is not treated as abandoned.
@@ -75,6 +163,8 @@ export default function RoomClient({ code }: { code: string }) {
         // Our own action is always the newest thing we know about.
         if (next) {
           version.current = next.version;
+          lastChange.current = Date.now();
+          resting.current = Boolean(next.game?.roundOver) || next.status === "finished";
           setView(next);
         }
       } catch (e) {

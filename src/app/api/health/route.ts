@@ -53,6 +53,15 @@ export async function GET() {
     return NextResponse.json(result);
   }
 
+  // Without the publishable key the browser cannot open a websocket, so every
+  // client falls back to polling hard. Not broken, just several times more
+  // expensive — worth being able to see at a glance.
+  result.realtime =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      ? "live updates enabled"
+      : "no publishable key — set NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, clients are polling instead";
+
   try {
     await createSupabaseStore().get("HEALTH");
     result.ready = true;
