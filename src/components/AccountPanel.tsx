@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import AppMenu from "./AppMenu";
 import {
   accountsAvailable,
   currentAccount,
@@ -76,6 +77,7 @@ export default function AccountPanel() {
 
   return (
     <main className="home">
+      <AppMenu className="corner" />
       <div className="home-card">
         <h1>{account ? account.username : "Your account"}</h1>
 

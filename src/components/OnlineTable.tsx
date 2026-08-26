@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { End, GameState, Seat, TileId } from "@/engine/types";
 import type { PlayerView } from "@/server/types";
 import Board from "./Board";
+import AppMenu from "./AppMenu";
 import CapicuaMoment from "./CapicuaMoment";
 import TauntPrompt from "./TauntPrompt";
 import { closingPlay } from "@/engine/engine";
@@ -166,6 +167,7 @@ export default function OnlineTable({
           <span className="value">{usScore}</span>
         </div>
         <div className="score-meta">
+          <AppMenu inGame={!game.matchOver} />
           <span>Round {game.roundNumber}</span>
           <span>First to {view.target}</span>
           <span className="room-code">{view.code}</span>

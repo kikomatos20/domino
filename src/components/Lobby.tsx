@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { PlayerView } from "@/server/types";
 import type { Seat } from "@/engine/types";
 import TableChat from "./TableChat";
+import AppMenu from "./AppMenu";
 
 const SEAT_LABEL: Record<Seat, string> = {
   0: "South",
@@ -57,6 +58,7 @@ export default function Lobby({
 
   return (
     <main className="home lobby-page">
+      <AppMenu className="corner" />
       <div className="lobby-stack">
       <div className="home-card lobby">
         <h1>Table {view.code}</h1>

@@ -23,6 +23,7 @@ import PlayableHand from "./PlayableHand";
 import ReviewPanel from "./ReviewPanel";
 import Board from "./Board";
 import type { EndAnchors } from "./Board";
+import AppMenu from "./AppMenu";
 import CapicuaMoment from "./CapicuaMoment";
 import TauntPrompt, { MAX_TAUNT } from "./TauntPrompt";
 import { reportSolo } from "@/lib/auth";
@@ -167,6 +168,7 @@ export default function Game() {
           <span className="value">{state.matchScore[0]}</span>
         </div>
         <div className="score-meta">
+          <AppMenu inGame={!state.matchOver} />
           <span>Round {state.roundNumber}</span>
           <span>First to {state.target}</span>
           <select
