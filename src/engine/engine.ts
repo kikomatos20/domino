@@ -246,7 +246,14 @@ export function applyMove(state: GameState, seat: Seat, move: Move): GameState {
     history: [...state.history, record],
   };
 
-  if (hand.length === 0) return endRound(next, { kind: "domino", winnerSeat: seat });
+  if (hand.length === 0) {
+    return endRound(next, {
+      kind: "domino",
+      winnerSeat: seat,
+      // Judged against the position *before* the tile landed.
+      capicua: isCapicua(state, move),
+    });
+  }
 
   // Tranca check: ends only change when a tile is played, so if nobody at the
   // table can match either end right now, the round is dead — end it immediately
@@ -287,9 +294,27 @@ export function applyPass(state: GameState, seat: Seat): GameState {
 
 // ---------- round & match resolution ----------
 
+/**
+ * A capicúa: going out on a tile that fitted both ends, the ends being
+ * different numbers. Both ends showing the same suit means there was only ever
+ * one number in play, so it does not count; nor can a double, for the same
+ * reason. No points attach to it here — it is recognised, not rewarded.
+ */
+export function isCapicua(state: GameState, move: Move): boolean {
+  if (state.line.length === 0) return false;
+  const { a, b } = parseTile(move.tileId);
+  if (a === b) return false;
+  const left = state.leftEnd as number;
+  const right = state.rightEnd as number;
+  if (left === right) return false;
+  return (a === left && b === right) || (a === right && b === left);
+}
+
 function endRound(
   state: GameState,
-  cause: { kind: "domino"; winnerSeat: Seat } | { kind: "blocked" }
+  cause:
+    | { kind: "domino"; winnerSeat: Seat; capicua?: boolean }
+    | { kind: "blocked" }
 ): GameState {
   const pips = state.hands.map(handPips) as RoundResult["pips"];
   const teamPips: [number, number] = [pips[0] + pips[2], pips[1] + pips[3]];
@@ -303,6 +328,7 @@ function endRound(
       winnerSeat: cause.winnerSeat,
       points: teamPips[(1 - team) as Team],
       pips,
+      capicua: cause.capicua ?? false,
     };
   } else if (teamPips[0] === teamPips[1]) {
     result = { kind: "tie", winningTeam: null, winnerSeat: null, points: 0, pips };

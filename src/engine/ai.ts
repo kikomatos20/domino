@@ -7,8 +7,28 @@
 // outstanding doubles, and dumping weight when the round looks like it will
 // close.
 
-import { allTiles, isDouble, legalMoves, parseTile, teamOf, tileId, tilePips } from "./engine";
+import {
+  allTiles,
+  isCapicua,
+  isDouble,
+  legalMoves,
+  parseTile,
+  teamOf,
+  tileId,
+  tilePips,
+} from "./engine";
+import { manoAt, roleOf } from "./roles";
 import type { End, GameState, Move, Seat, TileId } from "./types";
+
+/** Where the round has got to. Different phases reward different things. */
+export type Phase = "opening" | "early" | "middle" | "end";
+
+export function phaseOf(state: GameState, handSize: number): Phase {
+  if (state.line.length === 0) return "opening";
+  if (handSize <= 3) return "end";
+  if (state.line.length <= 6) return "early";
+  return "middle";
+}
 
 export type Difficulty = "easy" | "medium" | "hard";
 
@@ -40,6 +60,16 @@ export interface Knowledge {
   outstandingDoubles: Set<number>;
   /** Tiles left in the other three hands. */
   tilesOut: number;
+  /**
+   * Suits nobody else can possibly answer: every tile showing that number is
+   * either on the table or in your own hand. Knowing a suit is dead is what
+   * turns a hopeful block into a certain one.
+   */
+  deadSuits: Set<number>;
+  /** Pips still off the table, split between the three hidden hands. */
+  unseenPips: number;
+  /** What you are carrying right now. */
+  myPips: number;
 }
 
 export function readTable(state: GameState, seat: Seat): Knowledge {
@@ -80,7 +110,87 @@ export function readTable(state: GameState, seat: Seat): Knowledge {
     0
   );
 
-  return { suitCount, voids, unseen, unseenSuit, outstandingDoubles, tilesOut };
+  // A suit is dead when none of it is unaccounted for. Everything showing that
+  // number is on the table or in this hand, so no opponent can answer it.
+  const deadSuits = new Set<number>();
+  for (let suit = 0; suit <= 6; suit++) {
+    if (unseenSuit[suit] === 0) deadSuits.add(suit);
+  }
+
+  const unseenPips = unseen.reduce((sum, id) => sum + tilePips(id), 0);
+  const myPips = hand.reduce((sum, id) => sum + tilePips(id), 0);
+
+  return {
+    suitCount,
+    voids,
+    unseen,
+    unseenSuit,
+    outstandingDoubles,
+    tilesOut,
+    deadSuits,
+    unseenPips,
+    myPips,
+  };
+}
+
+/**
+ * Would this move shut the table, as far as you can actually tell?
+ *
+ * Deliberately built from public information only. The engine could simply
+ * apply the move and read the result, but that would be reading the opponents'
+ * hands. A player knows a block is coming when both ends are dead suits —
+ * every tile matching them already accounted for — and that is the honest test.
+ */
+export function forcesBlock(
+  state: GameState,
+  seat: Seat,
+  move: Move,
+  k: Knowledge
+): boolean {
+  // Your last tile ends the round by going out, which is a domino, not a
+  // tranca. Different decision, different arithmetic.
+  if (state.hands[seat].length <= 1) return false;
+
+  const [left, right] = resultingEnds(state, move);
+
+  // Nobody hidden can answer either end.
+  if (k.unseenSuit[left] > 0 || k.unseenSuit[right] > 0) return false;
+
+  // And neither can you — otherwise the others simply pass back round to you
+  // and the round carries on.
+  return !state.hands[seat].some((id) => {
+    if (id === move.tileId) return false;
+    const { a, b } = parseTile(id);
+    return a === left || b === left || a === right || b === right;
+  });
+}
+
+/**
+ * What a blocked game would score, counted the way El Tigre counts it.
+ *
+ * You know your own pips exactly. Your partner's and the opponents' you can
+ * only estimate, so share out the unseen pips in proportion to how many tiles
+ * each of them holds. Positive means your side comes out lighter and wins.
+ */
+export function blockedMargin(
+  state: GameState,
+  seat: Seat,
+  k: Knowledge,
+  spentPips: number
+): number {
+  const partner = ((seat + 2) % 4) as Seat;
+  const opponents = [((seat + 1) % 4) as Seat, ((seat + 3) % 4) as Seat];
+  const hidden = k.unseen.length || 1;
+  const perTile = k.unseenPips / hidden;
+
+  const mine = k.myPips - spentPips;
+  const partnerEstimate = state.hands[partner].length * perTile;
+  const theirs = opponents.reduce<number>(
+    (sum, o) => sum + state.hands[o].length * perTile,
+    0
+  );
+
+  return theirs - (mine + partnerEstimate);
 }
 
 /** The suit value a move leaves exposed at the end it is played on. */
@@ -193,35 +303,85 @@ export function scoreMoves(
   const opponents = [((seat + 1) % 4) as Seat, ((seat + 3) % 4) as Seat];
   const k = readTable(state, seat);
 
-  // Easy play is deliberately shallow: shed weight, ignore everything else.
+  // Easy play is shallow but not blind. It plays for weight, and it still
+  // recognises the two things no player at any level should miss: going out,
+  // and shutting a game its side would win.
   if (difficulty === "easy") {
     return moves
-      .map((move) => ({
-        move,
-        score: tilePips(move.tileId) * 0.5 + jitter() * 3,
-        reasons: ["Playing for weight only"],
-      }))
+      .map((move) => {
+        const reasons: string[] = ["Playing for weight"];
+        let score = tilePips(move.tileId) * 0.5 + jitter() * 3;
+
+        if (hand.length === 1) {
+          score += 1000;
+          reasons.push("Plays your last tile and wins the round");
+        } else if (forcesBlock(state, seat, move, k)) {
+          const margin = blockedMargin(state, seat, k, tilePips(move.tileId));
+          score += margin > 0 ? 12 : -12;
+          reasons.push(
+            margin > 0
+              ? "Shuts the game with your side lighter"
+              : "Would shut the game with your side heavier"
+          );
+        }
+        return { move, score, reasons };
+      })
       .sort((a, b) => b.score - a.score);
   }
 
   const hard = difficulty === "hard";
-  const endgame = hand.length <= 3 || k.tilesOut <= 6;
+
+  /**
+   * Every level understands the same ideas; they differ in how strongly they
+   * act on them. Easy (handled above) sees the block but still plays mostly by
+   * weight, medium plays sound dominoes, hard counts properly. This keeps a
+   * real ladder without making any level look like it cannot read the table.
+   */
+  const conviction = hard ? 1 : 0.7;
+
+  const phase = phaseOf(state, hand.length);
+  const endgame = phase === "end";
+
+  // Your job right now, which moves as people pass. Tile counts are public, so
+  // this is knowledge the AI is entitled to.
+  const mano = manoAt(state.hands, state.opener);
+  const role = roleOf(seat, mano);
+  // The mano plays their own hand; everyone else is working for the team.
+  const teamDuty = role === "mano" ? 0.45 : role === "tercera" ? 1.25 : 1;
 
   const scored = moves.map((move) => {
     const { a, b } = parseTile(move.tileId);
     const reasons: string[] = [];
     let score = 0;
+    const weightOf = (id: TileId) => tilePips(id);
 
     // Going out ends the round in your favour — nothing beats it.
     if (hand.length === 1) {
       score += 1000;
       reasons.push("Plays your last tile and wins the round");
+      if (isCapicua(state, move)) {
+        // Worth no points in these rules, but worth saying out loud.
+        score += 0.5;
+        reasons.push("Closes on both ends — capicúa");
+      }
+    } else if (forcesBlock(state, seat, move, k)) {
+      // La tranca. Not a hunch: count first, then decide whether to shut it.
+      const margin = blockedMargin(state, seat, k, weightOf(move.tileId));
+      const stake = 26 * conviction;
+      score += margin > 0 ? stake : -stake;
+      reasons.push(
+        margin > 0
+          ? `Shuts the game (tranca) with your side about ${Math.round(margin)} pips lighter`
+          : `Would shut the game with your side about ${Math.round(-margin)} pips heavier — "la tranca es una jugada que no se debe hacer para perderla"`
+      );
     }
 
-    // Shedding weight protects you if the round is blocked.
+    // Shedding weight protects you if the round is blocked — but it matters far
+    // more late than early. Early on, position is worth more than points.
     const weight = tilePips(move.tileId);
-    score += weight * (endgame ? 0.75 : 0.4);
-    if (weight >= 9) reasons.push(`Sheds ${weight} points of weight`);
+    const weightPull = phase === "early" ? 0.3 : phase === "middle" ? 0.45 : 0.8;
+    score += weight * weightPull;
+    if (weight >= 9 && phase !== "early") reasons.push(`Sheds ${weight} points of weight`);
 
     // Doubles only fit one way, so place them while you can.
     if (isDouble(move.tileId)) {
@@ -239,14 +399,25 @@ export function scoreMoves(
       // Squeeze opponents onto suits they have already failed on.
       for (const o of opponents) {
         if (k.voids[o].has(exposed)) {
-          score += hard ? 4 : 3;
+          score += (hard ? 4 : 3) * teamDuty;
           reasons.push(`Leaves a ${exposed}, which an opponent has passed on`);
         }
       }
-      // Never shut out your own partner.
+      // Never shut out your own partner — unless you hold the lead, in which
+      // case El Tigre says play your own hand first.
       if (k.voids[partner].has(exposed)) {
-        score -= hard ? 5 : 3;
-        reasons.push(`Leaves a ${exposed}, which your partner cannot play`);
+        score -= (hard ? 5 : 3) * teamDuty;
+        reasons.push(
+          role === "mano"
+            ? `Leaves a ${exposed} your partner cannot play — acceptable while you hold the lead`
+            : `Leaves a ${exposed}, which your partner cannot play`
+        );
+      }
+
+      // A suit nobody else can answer is a door only you hold the key to.
+      if (k.deadSuits.has(exposed) && k.suitCount[exposed] > 0) {
+        score += 3 * conviction;
+        reasons.push(`Every remaining ${exposed} is in your hand — that end is yours alone`);
       }
 
       // Keep an answer to whatever you expose.
@@ -293,7 +464,7 @@ export function scoreMoves(
       score += mine * 0.8;
       score -= mNext * 3.6;
       score -= mFar * 1.4;
-      score += mPartner * 0.6;
+      score += mPartner * 0.6 * teamDuty;
 
       if (mNext < 0.6) {
         reasons.push(

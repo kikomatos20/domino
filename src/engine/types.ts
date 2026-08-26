@@ -37,6 +37,12 @@ export interface RoundResult {
   points: number;
   /** Pip totals per seat at round end. */
   pips: [number, number, number, number];
+  /**
+   * The winner went out on a tile that fitted both open ends, and the ends were
+   * different numbers. Worth no extra points under these rules — recognised and
+   * announced, nothing more.
+   */
+  capicua?: boolean;
 }
 
 export interface LastAction {

@@ -29,7 +29,7 @@ export default function ReviewPanel({
   roomCode?: string | null;
 }) {
   const review = useMemo(() => reviewRound(history, seat), [history, seat]);
-  const [lens, setLens] = useState<"principles" | "engine">("principles");
+  const [lens, setLens] = useState<"principles" | "engine" | "round">("principles");
   const [disputing, setDisputing] = useState<FeedbackContext | null>(null);
 
   /** The position this verdict was about, so it can be replayed exactly. */
@@ -72,13 +72,42 @@ export default function ReviewPanel({
           >
             Engine analysis
           </button>
+          <button
+            className={lens === "round" ? "active" : ""}
+            onClick={() => setLens("round")}
+          >
+            The round
+            {review.events.some((e) => e.kind === "lead") && (
+              <span className="tab-badge">lead moved</span>
+            )}
+          </button>
         </div>
 
         <div className="review-body">
-          {review.moves.length === 0 && (
+          {/* What happened around you — above all, who passed and where the
+              lead went as a result. */}
+          {lens === "round" &&
+            (review.events.length === 0 ? (
+              <p className="review-empty">
+                Nobody passed and the lead never moved — the opener held it all round.
+              </p>
+            ) : (
+              <ol className="round-log">
+                {review.events.map((e, i) => (
+                  <li key={`${e.at}-${i}`} className={`round-event ${e.kind}`}>
+                    <span className="round-event-tag">
+                      {e.kind === "lead" ? "Lead" : e.kind === "pass" ? "Pass" : "Capicúa"}
+                    </span>
+                    <span>{e.text}</span>
+                  </li>
+                ))}
+              </ol>
+            ))}
+
+          {lens !== "round" && review.moves.length === 0 && (
             <p className="review-empty">You didn&apos;t place a tile this round.</p>
           )}
-          {review.moves.map((m) => (
+          {lens !== "round" && review.moves.map((m) => (
             <MoveCard
               key={m.number}
               m={m}
@@ -122,7 +151,7 @@ function MoveCard({
   onDispute,
 }: {
   m: MoveReview;
-  lens: "principles" | "engine";
+  lens: "principles" | "engine" | "round";
   onDispute: () => void;
 }) {
   return (

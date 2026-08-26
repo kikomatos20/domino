@@ -20,6 +20,7 @@
 import {
   applyMove,
   handPips,
+  isCapicua,
   isDouble,
   legalMoves,
   parseTile,
@@ -28,6 +29,8 @@ import {
   tilePips,
 } from "./engine";
 import { exposedEnd, readTable, resultingEnds, scoreMoves } from "./ai";
+import { leadShifts, manoAt, roleOf } from "./roles";
+import type { Role } from "./roles";
 import type { End, GameState, Move, MoveRecord, PlacedTile, Seat, TileId } from "./types";
 
 /** Total pips in a double-six set — the basis of El Tigre's close arithmetic. */
@@ -35,8 +38,10 @@ const TOTAL_PIPS = 168;
 
 export type Verdict = "great" | "good" | "inaccuracy" | "mistake";
 
-/** Seat roles, named relative to the opener (el salidor). */
-export type Role = "mano" | "segunda" | "tercera" | "pie";
+// Roles live in their own module now, so the AI plays by the same doctrine the
+// review grades against. Re-exported here for the UI, which imports from us.
+export { manoAt, roleOf } from "./roles";
+export type { Role } from "./roles";
 
 export interface Note {
   kind: "plus" | "minus" | "info";
@@ -65,11 +70,28 @@ export interface MoveReview {
   } | null;
 }
 
+/**
+ * Something that happened during the round worth calling out, whoever did it.
+ *
+ * The move-by-move review only covers your own tiles, but the shape of a round
+ * is often set by what someone else did — above all a pass, which moves the
+ * lead without a tile being played.
+ */
+export interface RoundEvent {
+  kind: "pass" | "lead" | "capicua";
+  /** Position in the round's action list, so the UI can order things. */
+  at: number;
+  seat: Seat;
+  text: string;
+}
+
 export interface RoundReview {
   role: Role;
   roleTitle: string;
   roleAdvice: string;
   moves: MoveReview[];
+  /** Passes and lead changes, in the order they happened. */
+  events: RoundEvent[];
   passes: number;
   engineAgreement: number;
   accuracy: number;
@@ -128,29 +150,6 @@ function distinctOutcomes(state: GameState, moves: Move[]): number {
   return new Set(moves.map((m) => outcomeKey(state, m))).size;
 }
 
-export function roleOf(seat: Seat, mano: Seat): Role {
-  const offset = (seat - mano + 4) % 4;
-  return offset === 0 ? "mano" : offset === 1 ? "segunda" : offset === 2 ? "tercera" : "pie";
-}
-
-/**
- * Who holds the lead right now.
- *
- * The mano is not fixed for the round. El Tigre is explicit that the roles move
- * as players pass — the lead belongs to whoever has the fewest tiles left, and
- * on equal counts to whoever plays first. So a mano who passes hands the lead
- * to the next player, and everyone's job changes with it.
- */
-export function manoAt(hands: readonly string[][], opener: Seat): Seat {
-  const counts = hands.map((h) => h.length);
-  const fewest = Math.min(...counts);
-  for (let i = 0; i < 4; i++) {
-    const seat = ((opener + i) % 4) as Seat;
-    if (counts[seat] === fewest) return seat;
-  }
-  return opener;
-}
-
 function pipsOnTable(line: PlacedTile[]): number {
   return line.reduce((sum, t) => sum + t.left + t.right, 0);
 }
@@ -195,6 +194,68 @@ function closeMath(
     justified: teamMax <= cifraBase / 2,
     partnerSeat,
   };
+}
+
+/** How to refer to another seat, from `me`'s chair. */
+function whoIs(other: Seat, me: Seat): string {
+  const offset = (other - me + 4) % 4;
+  if (offset === 0) return "You";
+  if (offset === 1) return "The opponent on your right";
+  if (offset === 2) return "Your partner";
+  return "The opponent on your left";
+}
+
+/**
+ * The round's public story: every pass, and every time the lead moved.
+ *
+ * A pass is the moment worth logging. It does not lighten your hand, so passing
+ * hands the lead — and the duties that come with it — straight to someone else.
+ */
+function roundEvents(history: MoveRecord[], opener: Seat, me: Seat): RoundEvent[] {
+  const events: RoundEvent[] = [];
+  const shifts = new Map(leadShifts(history, opener).map((s) => [s.at, s]));
+
+  history.forEach((rec, index) => {
+    if (rec.kind === "pass") {
+      const ends = [rec.before.leftEnd, rec.before.rightEnd].filter(
+        (e): e is number => e !== null
+      );
+      const suits = [...new Set(ends)].join(" or ");
+      const wasMano = manoAt(rec.before.hands, opener) === rec.seat;
+      const who = whoIs(rec.seat, me);
+      const verb = who === "You" ? "passed" : "passed";
+      events.push({
+        kind: "pass",
+        at: index,
+        seat: rec.seat,
+        text: wasMano
+          ? `${who} ${verb} on the ${suits} while holding the lead — passing does not lighten your hand, so the lead goes with it.`
+          : `${who} ${verb} on the ${suits}. Everyone now knows ${
+              who === "You" ? "you hold" : "they hold"
+            } neither suit.`,
+      });
+    }
+
+    const shift = shifts.get(index);
+    if (shift) {
+      const to = whoIs(shift.to, me);
+      events.push({
+        kind: "lead",
+        at: index,
+        seat: shift.to,
+        text:
+          shift.cause === "pass"
+            ? `The lead passed to ${to.toLowerCase()} — fewest tiles left. ${
+                to === "You"
+                  ? "You are the mano now: play your own hand."
+                  : "Your job shifts with it."
+              }`
+            : `${to} took the lead on tile count.`,
+      });
+    }
+  });
+
+  return events;
 }
 
 /** Review every decision `seat` made during a round. */
@@ -475,6 +536,32 @@ export function reviewRound(history: MoveRecord[], seat: Seat): RoundReview {
         }
       }
 
+      // Going out on both ends at once.
+      if (remaining.length === 0 && isCapicua(state, played)) {
+        solo(
+          {
+            kind: "plus",
+            text: `Capicúa — you went out on a tile that fitted both ends (${rec.before.leftEnd} and ${rec.before.rightEnd}). No extra points in these rules, but it is the prettiest way to close a hand.`,
+          },
+          1
+        );
+      } else if (remaining.length === 1 && !closesRound) {
+        // Down to your last tile: could you have set up a capicúa?
+        const last = remaining[0];
+        const { a: la, b: lb } = parseTile(last);
+        const [nextLeft, nextRight] = resultingEnds(state, played);
+        if (
+          la !== lb &&
+          nextLeft !== nextRight &&
+          ((la === nextLeft && lb === nextRight) || (la === nextRight && lb === nextLeft))
+        ) {
+          principles.push({
+            kind: "info",
+            text: `Your last tile, the ${last}, now fits both ends — if it comes back to you, that is a capicúa.`,
+          });
+        }
+      }
+
       judgeClose(
         state,
         seat,
@@ -572,6 +659,7 @@ export function reviewRound(history: MoveRecord[], seat: Seat): RoundReview {
 
   return {
     role,
+    events: roundEvents(history, opener, seat),
     roleTitle: ROLE_TITLE[role],
     roleAdvice:
       ROLE_ADVICE[role] +

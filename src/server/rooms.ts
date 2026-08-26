@@ -17,6 +17,7 @@ import {
   nextRound,
 } from "@/engine/engine";
 import { chooseMove } from "@/engine/ai";
+import { manoAt } from "@/engine/roles";
 import type { Difficulty } from "@/engine/ai";
 import type { GameState, Move, Seat, TileId } from "@/engine/types";
 import { RoomError } from "./types";
@@ -69,6 +70,29 @@ function tileText(id: TileId): string {
   return id.replace("-", "|");
 }
 
+/**
+ * Say so when the lead changes hands.
+ *
+ * Passing does not lighten your hand, so a mano who passes stops being the
+ * mano — the lead goes to whoever now holds the fewest tiles, and everyone's
+ * job at the table changes with it. That is worth stating out loud.
+ */
+function announceLead(room: Room, before: GameState, after: GameState): void {
+  if (after.roundOver) return;
+  const was = manoAt(before.hands, before.opener);
+  const now = manoAt(after.hands, after.opener);
+  if (was === now) return;
+  say(room, {
+    kind: "event",
+    seat: now,
+    who: nameOf(room, now),
+    text:
+      before.lastAction?.kind === "pass"
+        ? `${nameOf(room, was)} passed — ${nameOf(room, now)} takes the lead (mano)`
+        : `${nameOf(room, now)} takes the lead (mano)`,
+  });
+}
+
 /** Note the result of a round once it lands. */
 function announceRoundEnd(room: Room, game: GameState): void {
   const r = game.roundOver;
@@ -78,7 +102,10 @@ function announceRoundEnd(room: Room, game: GameState): void {
     return;
   }
   const winner = r.winnerSeat !== null ? nameOf(room, r.winnerSeat) : "Nobody";
-  const how = r.kind === "domino" ? `${winner} dominoed` : `Blocked — ${winner}'s side was lighter`;
+  const how =
+    r.kind === "domino"
+      ? `${winner} dominoed${r.capicua ? " — capicúa!" : ""}`
+      : `Blocked — ${winner}'s side was lighter`;
   say(room, {
     kind: "event",
     seat: r.winnerSeat,
@@ -313,6 +340,7 @@ export async function playMove(
     who: player.nickname,
     text: `played ${tileText(move.tileId)}`,
   });
+  announceLead(room, game, room.game);
   announceRoundEnd(room, room.game);
   await advanceAi(room);
   await save(store, room);
@@ -333,6 +361,7 @@ export async function playPass(
 
   room.game = applyPass(game, player.seat);
   say(room, { kind: "move", seat: player.seat, who: player.nickname, text: "passed" });
+  announceLead(room, game, room.game);
   announceRoundEnd(room, room.game);
   await advanceAi(room);
   await save(store, room);
@@ -446,6 +475,7 @@ async function advanceAi(room: Room): Promise<void> {
     if (!player && !room.fillWithAi) break; // nobody can move; wait for a human
 
     const move = chooseMove(game, seat, { difficulty: room.difficulty });
+    const before = game;
     game = move ? applyMove(game, seat, move) : applyPass(game, seat);
     say(room, {
       kind: "move",
@@ -453,6 +483,7 @@ async function advanceAi(room: Room): Promise<void> {
       who: nameOf(room, seat),
       text: move ? `played ${tileText(move.tileId)}` : "passed",
     });
+    announceLead(room, before, game);
     announceRoundEnd(room, game);
   }
 

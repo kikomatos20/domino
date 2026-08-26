@@ -77,13 +77,16 @@ function isHorizontalTravel(dir: Dir): boolean {
   return dir === "R" || dir === "L";
 }
 
-/** A double is crosswise: short along the chain, wide across it. */
-function extents(dbl: boolean) {
-  return {
-    along: dbl ? TILE_SHORT : TILE_LONG,
-    across: dbl ? TILE_LONG : TILE_SHORT,
-  };
-}
+/**
+ * Every tile on an arm lies along the chain, doubles included.
+ *
+ * Only the opening tile is crosswise, because it is the spinner. A double
+ * turned across a run reads as a stack rather than a link — especially where
+ * it lands right beside the spinner — so on the arms they lie in line like
+ * everything else.
+ */
+const ALONG = TILE_LONG;
+const ACROSS = TILE_SHORT;
 
 interface Rect {
   x: number;
@@ -93,15 +96,14 @@ interface Rect {
 }
 
 /** Place a tile whose trailing edge sits at `cursor`, travelling in `dir`. */
-function rectFor(cursor: [number, number], dir: Dir, dbl: boolean): Rect {
-  const { along, across } = extents(dbl);
+function rectFor(cursor: [number, number], dir: Dir): Rect {
   const [cx, cy] = cursor;
   const travelH = isHorizontalTravel(dir);
   return {
-    x: dir === "R" ? cx : dir === "L" ? cx - along : cx - across / 2,
-    y: dir === "D" ? cy : dir === "U" ? cy - along : cy - across / 2,
-    w: travelH ? along : across,
-    h: travelH ? across : along,
+    x: dir === "R" ? cx : dir === "L" ? cx - ALONG : cx - ACROSS / 2,
+    y: dir === "D" ? cy : dir === "U" ? cy - ALONG : cy - ACROSS / 2,
+    w: travelH ? ALONG : ACROSS,
+    h: travelH ? ACROSS : ALONG,
   };
 }
 
@@ -113,9 +115,8 @@ interface Ring {
 }
 
 /**
- * Turn early enough that the tile coming out of a corner — which is placed
- * beyond the end of the run, and may be a crosswise double a full tile-length
- * wide — still fits on the table.
+ * Turn early enough that the tile coming out of a corner — placed beyond the
+ * end of the run, a full tile long — still fits on the table.
  */
 const TURN_INSET = TILE_LONG;
 
@@ -140,31 +141,21 @@ function exceeds(r: Rect, dir: Dir, ring: Ring): boolean {
 
 /**
  * Turn the corner. `cursor` is where the chain leaves the previous tile — the
- * middle of the face it exits. Two shapes, depending on the turning tile:
+ * middle of the face it exits.
  *
- *  - A normal tile runs *along* the new direction, so it cannot lie flat against
- *    the face it is turning off. It tucks into the corner square instead,
- *    alongside the end of the old run, making the familiar L.
- *  - A double lies *crosswise* to the new direction, so it does sit squarely
- *    beyond that face, centred on it, and the chain leaves from its far side.
+ * A tile running *along* the new direction cannot lie flat against the face it
+ * is turning off, so it tucks into the corner square instead, alongside the end
+ * of the old run, making the familiar L.
  */
 function cornerCursor(
   cursor: [number, number],
   from: Dir,
   to: Dir,
-  prevAcross: number,
-  dbl: boolean
+  prevAcross: number
 ): [number, number] {
-  const { across, along } = extents(dbl);
-  if (dbl) {
-    return [
-      cursor[0] + VEC[from][0] * (across / 2) - VEC[to][0] * (along / 2),
-      cursor[1] + VEC[from][1] * (across / 2) - VEC[to][1] * (along / 2),
-    ];
-  }
   return [
-    cursor[0] - VEC[from][0] * (across / 2) + VEC[to][0] * (prevAcross / 2),
-    cursor[1] - VEC[from][1] * (across / 2) + VEC[to][1] * (prevAcross / 2),
+    cursor[0] - VEC[from][0] * (ACROSS / 2) + VEC[to][0] * (prevAcross / 2),
+    cursor[1] - VEC[from][1] * (ACROSS / 2) + VEC[to][1] * (prevAcross / 2),
   ];
 }
 
@@ -191,14 +182,11 @@ function walk(
   let prevAcross = startAcross;
 
   for (const { p, idx } of tiles) {
-    const dbl = p.left === p.right;
-    const { across, along } = extents(dbl);
-
     // Turn the corner if this tile would run off the table, or into the part of
     // the chain already on it. At most one turn per tile: a corner is measured
     // against the tile it turns off, so turning twice would offset the chain
     // from a tile that is not there and break the join.
-    let rect = rectFor(cursor, dir, dbl);
+    let rect = rectFor(cursor, dir);
     if (exceeds(rect, dir, ring) || collides(rect, placed)) {
       // A full lap done: coil inward so the chain never doubles back on itself.
       if (turns > 0 && turns % 4 === 0) {
@@ -209,10 +197,10 @@ function walk(
           bottom: ring.bottom - TILE_LONG,
         };
       }
-      cursor = cornerCursor(cursor, dir, CW[dir], prevAcross, dbl);
+      cursor = cornerCursor(cursor, dir, CW[dir], prevAcross);
       dir = CW[dir];
       turns++;
-      rect = rectFor(cursor, dir, dbl);
+      rect = rectFor(cursor, dir);
     }
 
     // On a table too small to coil a long chain cleanly, keep the tile on the
@@ -228,16 +216,16 @@ function walk(
       idx,
       x: rect.x,
       y: rect.y,
-      // Crosswise doubles stand upright on a horizontal run, flat on a vertical one.
-      vertical: isHorizontalTravel(dir) ? dbl : !dbl,
+      // Always along the run: upright on a vertical run, flat on a horizontal one.
+      vertical: !isHorizontalTravel(dir),
       reversed: forward ? dir === "L" || dir === "U" : dir === "R" || dir === "D",
       dir,
       arm: forward ? "fwd" : "bwd",
     });
     placed.push(rect);
 
-    cursor = [cursor[0] + VEC[dir][0] * along, cursor[1] + VEC[dir][1] * along];
-    prevAcross = across;
+    cursor = [cursor[0] + VEC[dir][0] * ALONG, cursor[1] + VEC[dir][1] * ALONG];
+    prevAcross = ACROSS;
   }
 
   return out;
