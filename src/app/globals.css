@@ -591,14 +591,19 @@ body {
 /* ---------- who you are ---------- */
 
 .profile {
+  --me: var(--gold);
   display: flex;
   align-items: center;
   gap: 13px;
   padding: 13px 15px;
   border-radius: 12px;
-  /* A bit of warmth against all that green. */
-  background: linear-gradient(120deg, rgba(212, 175, 55, 0.22), rgba(212, 175, 55, 0.05));
-  border: 1px solid rgba(212, 175, 55, 0.35);
+  /* Tinted with whichever colour they picked. */
+  background: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--me) 24%, transparent),
+    rgba(255, 255, 255, 0.04)
+  );
+  border: 1px solid color-mix(in srgb, var(--me) 40%, transparent);
 }
 
 .profile-avatar {
@@ -609,10 +614,37 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--gold);
+  background: var(--me);
   color: #1a1a1a;
   font-size: 1.35rem;
   font-weight: 800;
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.swatch {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.75;
+}
+
+.swatch:hover {
+  opacity: 1;
+}
+
+.swatch.on {
+  opacity: 1;
+  border-color: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
 }
 
 .profile-lines {

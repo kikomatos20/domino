@@ -18,7 +18,29 @@ export const accountsAvailable = supabaseConfigured;
 export interface Account {
   id: string;
   username: string;
+  /** Their avatar colour. */
+  colour: string;
 }
+
+/**
+ * The colours anyone can pick from.
+ *
+ * A fixed set rather than a free colour picker: every one of these is legible
+ * with dark text on it and sits with the table's palette. A free picker would
+ * let someone choose something invisible against the felt.
+ */
+export const AVATAR_COLOURS = [
+  "#d4af37",
+  "#5ec4e8",
+  "#7fd6a0",
+  "#c9a0dc",
+  "#e8985e",
+  "#e87f7f",
+  "#8ea9e8",
+  "#e8d95e",
+] as const;
+
+export const DEFAULT_COLOUR = AVATAR_COLOURS[0];
 
 const DOMAIN = "players.domino.invalid";
 
@@ -27,11 +49,30 @@ function addressFor(username: string): string {
 }
 
 function readAccount(user: { id: string; email?: string; user_metadata?: unknown }): Account {
-  const meta = user.user_metadata as { username?: string } | null;
+  const meta = user.user_metadata as { username?: string; colour?: string } | null;
+  const colour = meta?.colour;
   return {
     id: user.id,
     username: meta?.username ?? (user.email?.split("@")[0] ?? "player"),
+    // Only a colour from the list — never whatever happens to be stored.
+    colour: colour && (AVATAR_COLOURS as readonly string[]).includes(colour)
+      ? colour
+      : DEFAULT_COLOUR,
   };
+}
+
+/**
+ * Change your avatar colour.
+ *
+ * Kept on the account itself rather than in a table of its own: it travels
+ * with the session, so the menu badge changes the moment you pick one, with no
+ * extra request from every page that draws it.
+ */
+export async function setColour(colour: string): Promise<void> {
+  const db = browserClient();
+  if (!db) return;
+  if (!(AVATAR_COLOURS as readonly string[]).includes(colour)) return;
+  await db.auth.updateUser({ data: { colour } });
 }
 
 /** Create an account, then sign into it. */

@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import AppMenu from "./AppMenu";
 import {
+  AVATAR_COLOURS,
   accountsAvailable,
   currentAccount,
   fetchRecord,
+  setColour,
   signIn,
   signOut,
   signUp,
@@ -94,7 +96,7 @@ export default function AccountPanel() {
         ) : account ? (
           <>
             {/* Who you are, always — not only once there are results. */}
-            <div className="profile">
+            <div className="profile" style={{ "--me": account.colour } as React.CSSProperties}>
               <span className="profile-avatar">
                 {account.username.slice(0, 1).toUpperCase()}
               </span>
@@ -104,6 +106,21 @@ export default function AccountPanel() {
                   {stats
                     ? `${stats.online.played + stats.solo.played} matches played`
                     : "Signed in"}
+                </span>
+                <span className="swatches">
+                  {AVATAR_COLOURS.map((c) => (
+                    <button
+                      key={c}
+                      className={`swatch ${account.colour === c ? "on" : ""}`}
+                      style={{ background: c }}
+                      aria-label={`Use this colour`}
+                      aria-pressed={account.colour === c}
+                      onClick={async () => {
+                        setAccount({ ...account, colour: c });
+                        await setColour(c);
+                      }}
+                    />
+                  ))}
                 </span>
               </span>
             </div>

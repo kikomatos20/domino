@@ -61,6 +61,8 @@ function validate(username: string, password: string): void {
 export interface Account {
   id: string;
   username: string;
+  /** Chosen avatar colour, if they picked one. */
+  colour?: string;
 }
 
 /**
@@ -115,14 +117,52 @@ export async function createAccount(
  */
 export async function accountFor(accessToken: string | null): Promise<Account | null> {
   if (!accessToken) return null;
-  try {
-    const { data, error } = await admin().auth.getUser(accessToken);
-    if (error || !data.user) return null;
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const publishable =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url) return null;
+
+  const read = (user: {
+    id: string;
+    email?: string;
+    user_metadata?: unknown;
+  }): Account | null => {
+    const meta = user.user_metadata as { username?: string; colour?: string } | null;
     const username =
-      (data.user.user_metadata as { username?: string } | null)?.username ??
-      normaliseUsername(data.user.email?.split("@")[0] ?? "");
-    return username ? { id: data.user.id, username } : null;
-  } catch {
+      meta?.username ?? normaliseUsername(user.email?.split("@")[0] ?? "");
+    return username ? { id: user.id, username, colour: meta?.colour } : null;
+  };
+
+  try {
+    /**
+     * Ask as the caller, not as the server.
+     *
+     * A client built with the publishable key and the caller's token in the
+     * Authorization header is the canonical way to resolve a session. Handing
+     * a user's token to a service-role client is a different operation and
+     * does not reliably answer this question.
+     */
+    if (publishable) {
+      const asUser = createClient(url, publishable, {
+        auth: { persistSession: false, autoRefreshToken: false },
+        global: { headers: { Authorization: `Bearer ${accessToken}` } },
+      });
+      const { data, error } = await asUser.auth.getUser();
+      if (!error && data.user) return read(data.user);
+      if (error) {
+        console.error("[domino] session rejected:", error.message, error.status);
+      }
+    }
+
+    // Fallback for a deployment without a publishable key configured.
+    const { data, error } = await admin().auth.getUser(accessToken);
+    if (error) console.error("[domino] service getUser failed:", error.message);
+    if (error || !data.user) return null;
+    return read(data.user);
+  } catch (error) {
+    console.error("[domino] could not verify session", error);
     return null;
   }
 }

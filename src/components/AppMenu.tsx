@@ -77,7 +77,11 @@ export default function AppMenu({
         {account && (
           // The initial rather than a bare dot: at a glance it says *who*,
           // which matters on a shared laptop.
-          <span className="app-menu-who" aria-hidden>
+          <span
+            className="app-menu-who"
+            style={{ background: account.colour }}
+            aria-hidden
+          >
             {account.username.slice(0, 1).toUpperCase()}
           </span>
         )}
