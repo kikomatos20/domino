@@ -19,6 +19,7 @@ import {
 import { chooseMove } from "@/engine/ai";
 import { manoAt } from "@/engine/roles";
 import { recordMatch } from "./results";
+import { recordRound } from "./roundStats";
 import type { Difficulty } from "@/engine/ai";
 import type { GameState, Move, Seat, TileId } from "@/engine/types";
 import { RoomError } from "./types";
@@ -477,6 +478,7 @@ export async function playMove(
   });
   announceLead(room, game, room.game);
   announceRoundEnd(room, room.game);
+  await recordRound(room, room.game);
   await advanceAi(room);
   await save(store, room);
   return room;
@@ -498,6 +500,7 @@ export async function playPass(
   say(room, { kind: "move", seat: player.seat, who: player.nickname, text: "passed" });
   announceLead(room, game, room.game);
   announceRoundEnd(room, room.game);
+  await recordRound(room, room.game);
   await advanceAi(room);
   await save(store, room);
   return room;
@@ -620,6 +623,7 @@ async function advanceAi(room: Room): Promise<void> {
     });
     announceLead(room, before, game);
     announceRoundEnd(room, game);
+    await recordRound(room, game);
   }
 
   room.game = game;

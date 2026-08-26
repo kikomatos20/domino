@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { accountFor } from "@/server/accounts";
-import { recordFor, recordSolo } from "@/server/results";
+import { recordFor, recordSolo, statsFor } from "@/server/results";
+import { recordSoloRound } from "@/server/roundStats";
 import { fail } from "../_util";
 
 export const dynamic = "force-dynamic";
@@ -16,10 +17,11 @@ export async function GET(request: Request) {
   try {
     const account = await accountFor(tokenFrom(request));
     if (!account) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
-    return NextResponse.json({
-      username: account.username,
-      record: await recordFor(account.id),
-    });
+    const [record, stats] = await Promise.all([
+      recordFor(account.id),
+      statsFor(account.id),
+    ]);
+    return NextResponse.json({ username: account.username, record, stats });
   } catch (error) {
     return fail(error);
   }
@@ -39,6 +41,13 @@ export async function POST(request: Request) {
     if (!account) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
     const body = await request.json();
+
+    // A finished solo round rather than a finished match.
+    if (body?.round) {
+      await recordSoloRound(account.id, body.round);
+      return NextResponse.json({ ok: true });
+    }
+
     const teamScore = Number(body?.teamScore);
     const opponentScore = Number(body?.opponentScore);
     const rounds = Number(body?.rounds);

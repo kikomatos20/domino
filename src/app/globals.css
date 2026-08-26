@@ -483,6 +483,108 @@ body {
   margin-bottom: 2px;
 }
 
+/* ---------- stats ---------- */
+
+.stats {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+}
+
+.stats-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 560px) {
+  .stats-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.stats-block {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  padding: 11px 13px;
+}
+
+.stats-block h3 {
+  margin: 0 0 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+}
+
+.stats-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.82rem;
+}
+
+.stats-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.stats-list li span:first-child {
+  opacity: 0.7;
+}
+
+.stats-figure {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.stats-list li.shiny .stats-figure {
+  color: var(--gold);
+}
+
+.stats-empty,
+.stats-note {
+  margin: 6px 0 0;
+  font-size: 0.72rem;
+  opacity: 0.5;
+}
+
+/* A bar per day. No axes, no library, nothing to misread. */
+.trend {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 90px;
+}
+
+.trend-bar {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 3px;
+}
+
+.trend-fill {
+  width: 100%;
+  min-height: 2px;
+  background: linear-gradient(180deg, var(--gold), rgba(212, 175, 55, 0.4));
+  border-radius: 3px 3px 0 0;
+}
+
+.trend-label {
+  font-size: 0.6rem;
+  opacity: 0.45;
+}
+
 /* ---------- your record ---------- */
 
 .record-tally {

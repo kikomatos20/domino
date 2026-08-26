@@ -111,19 +111,54 @@ export interface PlayRecord {
   recent: MatchResult[];
 }
 
+export interface Tally {
+  played: number;
+  won: number;
+  lost: number;
+  bestStreak: number;
+  streak: number;
+  margin: number;
+}
+
+export interface RoundTotals {
+  rounds: number;
+  won: number;
+  capicuas: number;
+  dominoes: number;
+  closedWon: number;
+  closedLost: number;
+  passes: number;
+  accuracy: number | null;
+  engineAgreement: number | null;
+  teamPlay: number | null;
+  pipsWhenLosing: number | null;
+  trend: { day: string; accuracy: number; rounds: number }[];
+}
+
+export interface Stats {
+  online: Tally;
+  solo: Tally;
+  partners: { name: string; played: number; won: number }[];
+  onlineRounds: RoundTotals;
+  soloRounds: RoundTotals;
+}
+
 async function authHeaders(): Promise<Record<string, string> | null> {
   const token = await accessToken();
   return token ? { authorization: `Bearer ${token}` } : null;
 }
 
-/** Your own wins and losses. Null when nobody is signed in. */
-export async function fetchRecord(): Promise<PlayRecord | null> {
+/** Your own wins, losses and everything derived from them. */
+export async function fetchRecord(): Promise<{
+  record: PlayRecord;
+  stats: Stats;
+} | null> {
   const headers = await authHeaders();
   if (!headers) return null;
   const response = await fetch("/api/results", { headers, cache: "no-store" });
   if (!response.ok) return null;
   const body = await response.json();
-  return body.record ?? null;
+  return body.record ? { record: body.record, stats: body.stats } : null;
 }
 
 /**
@@ -147,6 +182,21 @@ export async function reportSolo(result: {
     });
   } catch {
     // Nothing to do about it, and nothing worth saying.
+  }
+}
+
+/** Report a finished solo round. Same silence on failure as the match report. */
+export async function reportSoloRound(round: unknown): Promise<void> {
+  try {
+    const headers = await authHeaders();
+    if (!headers) return;
+    await fetch("/api/results", {
+      method: "POST",
+      headers: { ...headers, "content-type": "application/json" },
+      body: JSON.stringify({ round }),
+    });
+  } catch {
+    // Not worth surfacing.
   }
 }
 

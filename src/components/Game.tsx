@@ -26,7 +26,8 @@ import type { EndAnchors } from "./Board";
 import AppMenu from "./AppMenu";
 import CapicuaMoment from "./CapicuaMoment";
 import TauntPrompt, { MAX_TAUNT } from "./TauntPrompt";
-import { reportSolo } from "@/lib/auth";
+import { reportSolo, reportSoloRound } from "@/lib/auth";
+import { statsFor } from "@/engine/roundStats";
 
 const SEAT_NAMES: Record<Seat, string> = { 0: "You", 1: "East", 2: "Partner", 3: "West" };
 /** Long enough to watch each computer play land and read who played what. */
@@ -105,6 +106,20 @@ export default function Game() {
   useEffect(() => {
     if (state?.roundOver) setLastRound(state.history);
   }, [state?.roundOver, state?.history]);
+
+  /**
+   * Report each finished solo round, once.
+   *
+   * The stats are worked out here because solo runs here — the server never
+   * sees these games. That is also why they are stored and shown separately.
+   */
+  const reportedRound = useRef<number | null>(null);
+  useEffect(() => {
+    if (!state?.roundOver || reportedRound.current === state.roundNumber) return;
+    reportedRound.current = state.roundNumber;
+    const stat = statsFor(state, HUMAN);
+    if (stat) reportSoloRound(stat);
+  }, [state?.roundOver, state?.roundNumber, state]);
 
   // Auto-clear pass banner.
   useEffect(() => {

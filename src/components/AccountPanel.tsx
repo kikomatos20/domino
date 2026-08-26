@@ -12,7 +12,9 @@ import {
   signUp,
   type Account,
   type PlayRecord,
+  type Stats,
 } from "@/lib/auth";
+import StatsPanel from "./StatsPanel";
 
 /**
  * Making and using an account.
@@ -30,6 +32,7 @@ export default function AccountPanel() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [record, setRecord] = useState<PlayRecord | null>(null);
+  const [stats, setStats] = useState<Stats | null>(null);
 
   useEffect(() => {
     currentAccount()
@@ -41,9 +44,13 @@ export default function AccountPanel() {
   useEffect(() => {
     if (!account) {
       setRecord(null);
+      setStats(null);
       return;
     }
-    fetchRecord().then(setRecord);
+    fetchRecord().then((data) => {
+      setRecord(data?.record ?? null);
+      setStats(data?.stats ?? null);
+    });
   }, [account]);
 
   const submit = async () => {
@@ -85,44 +92,12 @@ export default function AccountPanel() {
           <p className="home-sub">One moment…</p>
         ) : account ? (
           <>
-            {record ? (
-              <>
-                <div className="record-tally">
-                  <span className="record-win">{record.won} W</span>
-                  <span className="record-loss">{record.lost} L</span>
-                  {record.played > 0 && (
-                    <span className="record-rate">
-                      {Math.round((record.won / record.played) * 100)}%
-                    </span>
-                  )}
-                </div>
-
-                {record.played === 0 ? (
-                  <p className="home-sub">
-                    Nothing yet. Finish a match to a hundred and it lands here.
-                  </p>
-                ) : (
-                  <ul className="record-list">
-                    {record.recent.map((m, i) => (
-                      <li key={i} className={`record-row ${m.won ? "won" : "lost"}`}>
-                        <span className="record-verdict">{m.won ? "Won" : "Lost"}</span>
-                        <span className="record-score">
-                          {m.teamScore}–{m.opponentScore}
-                        </span>
-                        <span className="record-where">
-                          {m.solo ? "vs computer" : `with ${m.partnerName ?? "a partner"}`}
-                        </span>
-                        <span className="record-rounds">
-                          {m.rounds} round{m.rounds === 1 ? "" : "s"}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </>
+            {stats ? (
+              <StatsPanel stats={stats} />
             ) : (
               <p className="home-sub">Signed in. Match results are saved to this name.</p>
             )}
+
             <div className="home-actions">
               <Link className="home-button primary" href="/online">
                 Play
