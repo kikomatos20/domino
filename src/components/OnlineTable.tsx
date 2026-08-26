@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import type { End, GameState, Seat, TileId } from "@/engine/types";
 import type { PlayerView } from "@/server/types";
 import Board from "./Board";
+import CapicuaMoment from "./CapicuaMoment";
+import { closingPlay } from "@/engine/engine";
 import type { EndAnchors } from "./Board";
 import DominoTile from "./DominoTile";
 import FeedbackButton from "./FeedbackButton";
@@ -29,10 +31,13 @@ export default function OnlineTable({
   onPass,
   onReady,
   onChat,
+  fromStart,
   busy,
   error,
 }: {
   view: PlayerView;
+  /** We watched this match begin, rather than opening the page onto it. */
+  fromStart: boolean;
   onMove: (tileId: TileId, end: End) => void;
   onPass: () => void;
   onReady: (ready: boolean) => void;
@@ -56,7 +61,10 @@ export default function OnlineTable({
   const seat = (s: Seat) => view.seats[s];
 
   // Other players' moves arrive in batches; reveal them one at a time.
-  const replay = useReplay(game.line, game.lastAction);
+  const replay = useReplay(game.line, game.lastAction, {
+    round: game.roundNumber,
+    fromStart,
+  });
   const myTurn =
     game.currentSeat === you && !game.roundOver && !game.matchOver && !replay.catchingUp;
 
@@ -109,13 +117,27 @@ export default function OnlineTable({
     },
   });
 
+  /**
+   * A capicúa gets its own moment before the scoreboard appears.
+   *
+   * Held until the replay has caught up, so the tile that did it is on the
+   * table before we make a fuss about it.
+   */
+  const [capicuaSeen, setCapicuaSeen] = useState(false);
+  useEffect(() => setCapicuaSeen(false), [game.roundNumber]);
+
+  const closing = game.roundOver?.capicua ? closingPlay(game.history) : null;
+  const showCapicua = Boolean(closing) && !capicuaSeen && !replay.catchingUp;
+
   const played = useFading(replay.justPlayed, 1500);
   const playedBanner = played
     ? `${seat(played.seat).isYou ? "You" : seat(played.seat).label} played ${Math.min(played.left, played.right)} | ${Math.max(played.left, played.right)}`
     : null;
 
   return (
-    <main className={`table-root ${chatOpen ? "with-chat" : ""}`}>
+    <main
+      className={`table-root ${chatOpen ? "with-chat" : ""} ${showCapicua ? "shaken" : ""}`}
+    >
       <header className="scoreboard">
         <div className="score us">
           <span className="label">Us</span>
@@ -186,7 +208,16 @@ export default function OnlineTable({
         />
       </div>
 
-      {game.roundOver && !reviewing && !replay.catchingUp && (
+      {showCapicua && closing && (
+        <CapicuaMoment
+          tileId={closing.tileId}
+          who={seat(closing.seat).isYou ? "You" : seat(closing.seat).label}
+          ends={closing.ends}
+          onDone={() => setCapicuaSeen(true)}
+        />
+      )}
+
+      {game.roundOver && !reviewing && !replay.catchingUp && !showCapicua && (
         <div className="overlay">
           <div className="dialog">
             {game.matchOver ? (

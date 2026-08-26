@@ -2,14 +2,26 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { LastAction, PlacedTile } from "@/engine/types";
+import { replayFrom, revealedEnd } from "./replayOrder";
 
 /**
  * Time between revealed tiles when catching up on other players' moves. Long
  * enough for the placement animation to land, but shortened when several tiles
  * are waiting — nobody wants to sit through four slow replays before their turn.
  */
-const STEP_MS = 1400;
-const HURRIED_STEP_MS = 800;
+const STEP_MS = 1600;
+const HURRIED_STEP_MS = 1000;
+
+export interface ReplayOptions {
+  /** Which round these tiles belong to; a change means a fresh deal. */
+  round: number;
+  /**
+   * True when this table started in front of us rather than being joined
+   * halfway through. Someone opening the page onto a game already in progress
+   * should see it as it stands, not sit through twenty tiles of replay.
+   */
+  fromStart: boolean;
+}
 
 interface Replay {
   line: PlacedTile[];
@@ -32,14 +44,39 @@ interface Replay {
  * Tiles are only ever added at the two ends, so the difference between what is
  * shown and what has arrived is a prefix and/or a suffix.
  */
-export function useReplay(line: PlacedTile[], lastAction: LastAction | null): Replay {
-  const [shown, setShown] = useState<PlacedTile[]>(line);
+export function useReplay(
+  line: PlacedTile[],
+  lastAction: LastAction | null,
+  opts: ReplayOptions
+): Replay {
+  const { round, fromStart } = opts;
+  /**
+   * What has been shown so far.
+   *
+   * Starting this at `line` was the bug behind "I am pie but all three pieces
+   * were already on the board": the server resolves every computer seat before
+   * handing back the first view, so the table mounts with tiles already down
+   * and there is nothing left to replay. When we know the round started under
+   * us, begin from an empty table and walk it forward instead.
+   */
+  const [shown, setShown] = useState<PlacedTile[]>(fromStart ? [] : line);
   const [synthetic, setSynthetic] = useState<LastAction | null>(lastAction);
   const [justPlayed, setJustPlayed] = useState<PlacedTile | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seenRound = useRef<number>(round);
 
   useEffect(() => {
-    // A new round (or a rewind) — show it as it is.
+    // A fresh deal. The computers may already have opened it, so rewind to an
+    // empty table and let the tiles land one at a time.
+    if (seenRound.current !== round) {
+      seenRound.current = round;
+      setShown([]);
+      setSynthetic(null);
+      setJustPlayed(null);
+      return;
+    }
+
+    // A rewind we did not expect — show the truth rather than guess.
     if (line.length === 0 || line.length < shown.length) {
       setShown(line);
       setSynthetic(lastAction);
@@ -50,35 +87,21 @@ export function useReplay(line: PlacedTile[], lastAction: LastAction | null): Re
       return;
     }
 
-    const offset = matchOffset(line, shown);
-    if (offset === -1) {
-      // Cannot line the two up (shouldn't happen); just show the truth.
-      setShown(line);
-      setSynthetic(lastAction);
-      return;
-    }
-
-    const missingBefore = offset;
-    const missingAfter = line.length - offset - shown.length;
-    const backlog = missingBefore + missingAfter;
+    const backlog = line.length - shown.length;
     const step = backlog > 2 ? HURRIED_STEP_MS : STEP_MS;
 
     timer.current = setTimeout(() => {
-      // Reveal from the back first, then the front — either order reads fine,
-      // and this keeps the newest end moving.
-      if (missingAfter > 0) {
-        const next = line.slice(offset, offset + shown.length + 1);
-        const tile = next[next.length - 1];
-        setShown(next);
-        setJustPlayed(tile);
-        setSynthetic({ seat: tile.seat, kind: "play", move: { tileId: "", end: "right" } });
-      } else if (missingBefore > 0) {
-        const next = line.slice(offset - 1, offset + shown.length);
-        const tile = next[0];
-        setShown(next);
-        setJustPlayed(tile);
-        setSynthetic({ seat: tile.seat, kind: "play", move: { tileId: "", end: "left" } });
+      const next = replayFrom(line, shown);
+      if (next.length === shown.length) {
+        setShown(line);
+        setSynthetic(lastAction);
+        return;
       }
+      const end = revealedEnd(shown, next);
+      const tile = end === "left" ? next[0] : next[next.length - 1];
+      setShown(next);
+      setJustPlayed(tile);
+      setSynthetic({ seat: tile.seat, kind: "play", move: { tileId: "", end } });
     }, step);
 
     return () => {
@@ -104,23 +127,4 @@ export function useFading<T>(value: T, ms: number): T | null {
     return () => clearTimeout(t);
   }, [value, ms]);
   return shown;
-}
-
-/** Where `shown` sits inside `line`, or -1 if it does not. */
-function matchOffset(line: PlacedTile[], shown: PlacedTile[]): number {
-  if (shown.length === 0) return Math.max(0, line.length - 1);
-  const same = (a: PlacedTile, b: PlacedTile) =>
-    a.left === b.left && a.right === b.right && a.seat === b.seat;
-
-  for (let offset = 0; offset + shown.length <= line.length; offset++) {
-    let ok = true;
-    for (let i = 0; i < shown.length; i++) {
-      if (!same(line[offset + i], shown[i])) {
-        ok = false;
-        break;
-      }
-    }
-    if (ok) return offset;
-  }
-  return -1;
 }

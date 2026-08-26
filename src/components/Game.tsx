@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   applyMove,
   applyPass,
+  closingPlay,
   legalMoves,
   matchWinner,
   mustPass,
@@ -21,6 +22,7 @@ import PlayableHand from "./PlayableHand";
 import ReviewPanel from "./ReviewPanel";
 import Board from "./Board";
 import type { EndAnchors } from "./Board";
+import CapicuaMoment from "./CapicuaMoment";
 
 const SEAT_NAMES: Record<Seat, string> = { 0: "You", 1: "East", 2: "Partner", 3: "West" };
 /** Long enough to watch each computer play land and read who played what. */
@@ -33,6 +35,8 @@ export default function Game() {
   const [ends, setEnds] = useState<EndAnchors>({ left: null, right: null });
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [reviewing, setReviewing] = useState(false);
+  /** The round whose capicúa has already had its moment. */
+  const [capicuaRound, setCapicuaRound] = useState<number | null>(null);
   /** History of the round just finished, kept so review survives the next deal. */
   const [lastRound, setLastRound] = useState<GameState["history"]>([]);
 
@@ -109,8 +113,12 @@ export default function Game() {
   const humanMustPass = humanTurn && mustPass(state, HUMAN);
   const winner = matchWinner(state);
 
+  // A capicúa takes the table before the scoreboard does.
+  const closing = state.roundOver?.capicua ? closingPlay(state.history) : null;
+  const showCapicua = Boolean(closing) && capicuaRound !== state.roundNumber;
+
   return (
-    <main className="table-root">
+    <main className={`table-root ${showCapicua ? "shaken" : ""}`}>
       {/* Scoreboard */}
       <header className="scoreboard">
         <div className="score us">
@@ -180,8 +188,17 @@ export default function Game() {
         />
       </div>
 
+      {showCapicua && closing && (
+        <CapicuaMoment
+          tileId={closing.tileId}
+          who={SEAT_NAMES[closing.seat]}
+          ends={closing.ends}
+          onDone={() => setCapicuaRound(state.roundNumber)}
+        />
+      )}
+
       {/* Round / match end */}
-      {state.roundOver && !reviewing && (
+      {state.roundOver && !reviewing && !showCapicua && (
         <div className="overlay">
           <div className="dialog">
             {state.matchOver ? (

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyMove,
   applyPass,
+  closingPlay,
   isCapicua,
   legalMoves,
   newMatch,
@@ -259,6 +260,44 @@ describe("capicua", () => {
     expect(applyMove(state, 0, { tileId: "3-5", end: "right" }).roundOver?.capicua).toBe(
       false
     );
+  });
+
+  it("only ever describes the winning tile", () => {
+    // A tile that fits both ends mid-round is not a capicua — the round has to
+    // end on it. The engine only asks the question when a hand empties.
+    const state = position({
+      // Playing the 3-5 on the 5 leaves a 3 at both ends, and East holds one,
+      // so the round carries on.
+      hands: [["3-5", "0-1"], ["3-6"], ["2-2"], ["1-1"]],
+      line: [
+        { left: 3, right: 4, seat: 1 },
+        { left: 4, right: 5, seat: 2 },
+      ],
+      turn: 0,
+    });
+    // The 3-5 does fit both ends...
+    expect(isCapicua(state, { tileId: "3-5", end: "right" })).toBe(true);
+    // ...but this hand is not empty afterwards, so the round does not end and
+    // nothing is recorded. A capicua is the winning tile or it is nothing.
+    const after = applyMove(state, 0, { tileId: "3-5", end: "right" });
+    expect(after.roundOver).toBeNull();
+  });
+
+  it("reports the tile and the two ends it closed on", () => {
+    const state = position({
+      hands: [["3-5"], ["6-6"], ["2-2"], ["1-1"]],
+      line: [
+        { left: 3, right: 4, seat: 1 },
+        { left: 4, right: 5, seat: 2 },
+      ],
+      turn: 0,
+    });
+    const after = applyMove(state, 0, { tileId: "3-5", end: "right" });
+    expect(closingPlay(after.history)).toEqual({
+      seat: 0,
+      tileId: "3-5",
+      ends: [3, 5],
+    });
   });
 
   it("is never a double", () => {

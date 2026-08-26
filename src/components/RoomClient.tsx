@@ -31,6 +31,14 @@ export default function RoomClient({ code }: { code: string }) {
   /** Whether the websocket is carrying changes for us. */
   const live = useRef(false);
   const resting = useRef(false);
+  /**
+   * Did we watch this match start?
+   *
+   * If we were sitting in the lobby when it began, the opening tiles are news
+   * and should be dealt out one at a time. If we opened the page onto a game
+   * already in progress, they are history — show the table as it stands.
+   */
+  const sawLobby = useRef(false);
 
   const refresh = useCallback(async () => {
     // Never poll over the top of our own action — the reply to that is newer
@@ -47,6 +55,7 @@ export default function RoomClient({ code }: { code: string }) {
         version.current = next.version;
         lastChange.current = Date.now();
         resting.current = Boolean(next.game?.roundOver) || next.status === "finished";
+        if (next.status === "lobby") sawLobby.current = true;
         return next;
       });
     } catch (e) {
@@ -273,6 +282,7 @@ export default function RoomClient({ code }: { code: string }) {
       error={error}
       onMove={(tileId: TileId, end: End) => send({ action: "move", tileId, end })}
       onPass={() => send({ action: "pass" })}
+      fromStart={sawLobby.current}
       onReady={(ready: boolean) => send({ action: "ready", ready })}
       onChat={(text: string) => send({ action: "chat", text })}
     />

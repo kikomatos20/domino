@@ -357,6 +357,26 @@ function endRound(
   };
 }
 
+/**
+ * The play that ended the round, and the two ends it landed between.
+ *
+ * Only meaningful once a round is over. Used to show what a capicúa actually
+ * was — which tile, and which two numbers it joined — since that is the whole
+ * content of the thing.
+ */
+export function closingPlay(
+  history: MoveRecord[]
+): { seat: Seat; tileId: TileId; ends: [number, number] } | null {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const record = history[i];
+    if (record.kind !== "play" || !record.move) continue;
+    const { leftEnd, rightEnd } = record.before;
+    if (leftEnd === null || rightEnd === null) return null;
+    return { seat: record.seat, tileId: record.move.tileId, ends: [leftEnd, rightEnd] };
+  }
+  return null;
+}
+
 /** Convenience: winner of the match, if over. */
 export function matchWinner(state: GameState): Team | null {
   if (!state.matchOver) return null;

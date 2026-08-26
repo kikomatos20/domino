@@ -424,6 +424,102 @@ body {
   text-decoration: underline;
 }
 
+/* ---------- capicúa ---------- */
+
+.capicua {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(4, 20, 12, 0.86);
+  backdrop-filter: blur(3px);
+  animation: capicua-in 260ms ease-out both;
+  cursor: pointer;
+}
+
+.capicua.leaving {
+  animation: capicua-out 400ms ease-in both;
+}
+
+.capicua-tile {
+  transform: scale(2.4);
+  animation: capicua-tile 700ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.6));
+}
+
+.capicua-word {
+  margin: 26px 0 0;
+  font-size: clamp(2rem, 9vw, 3.4rem);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+  animation: capicua-word 500ms 220ms ease-out both;
+}
+
+.capicua-detail {
+  margin: 0;
+  font-size: 0.95rem;
+  opacity: 0.85;
+  animation: capicua-word 500ms 380ms ease-out both;
+}
+
+@keyframes capicua-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes capicua-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes capicua-tile {
+  from { transform: scale(0.4) rotate(-14deg); opacity: 0; }
+  to { transform: scale(2.4) rotate(0deg); opacity: 1; }
+}
+
+@keyframes capicua-word {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* The table takes the hit too. */
+.table-root.shaken {
+  animation: table-shake 620ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes table-shake {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  10% { transform: translate(-7px, 3px) rotate(-0.6deg); }
+  22% { transform: translate(6px, -4px) rotate(0.5deg); }
+  35% { transform: translate(-5px, -3px) rotate(-0.4deg); }
+  48% { transform: translate(4px, 3px) rotate(0.35deg); }
+  62% { transform: translate(-3px, 2px) rotate(-0.25deg); }
+  76% { transform: translate(2px, -1px) rotate(0.15deg); }
+  88% { transform: translate(-1px, 1px) rotate(-0.05deg); }
+}
+
+/* Nobody needs a board lurching about; hold still if they asked us to. */
+@media (prefers-reduced-motion: reduce) {
+  .capicua,
+  .capicua-tile,
+  .capicua-word,
+  .capicua-detail {
+    animation-duration: 1ms;
+  }
+  .capicua-tile {
+    transform: scale(2.4);
+  }
+  .table-root.shaken {
+    animation: none;
+  }
+}
+
 /* Seat swaps: asked for, and waiting on an answer. */
 .seat-pending {
   font-size: 0.72rem;
