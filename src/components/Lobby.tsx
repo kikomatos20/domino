@@ -79,7 +79,7 @@ export default function Lobby({
                 {SEAT_LABEL[s.seat]} · {teamOf(s.seat)}
               </span>
               <span className="seat-who">
-                {s.nickname ?? (view.fillWithAi ? "Computer" : "Waiting…")}
+                {s.nickname ?? (view.fillWithAi ? s.label : "Waiting…")}
                 {s.isYou && " (you)"}
               </span>
               {!s.nickname && view.you && (

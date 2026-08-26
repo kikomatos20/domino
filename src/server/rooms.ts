@@ -59,8 +59,16 @@ function seatOf(room: Room, token: string): Player | null {
 const CHAT_LIMIT = 120;
 const MAX_CHAT_LENGTH = 240;
 
+/**
+ * What to call whoever is in a seat.
+ *
+ * Computers are named by their seat rather than all sharing one word. With
+ * three of them at the table, "Computer played 5|6" three times in a row tells
+ * you nothing about who is doing what — and following the other players is most
+ * of the game.
+ */
 export function nameOf(room: Room, seat: Seat): string {
-  return room.players.find((p) => p.seat === seat)?.nickname ?? "Computer";
+  return room.players.find((p) => p.seat === seat)?.nickname ?? `Computer (${SEAT_NAME[seat]})`;
 }
 
 function say(
@@ -615,6 +623,7 @@ export function viewFor(room: Room, token: string | null): PlayerView {
     return {
       seat,
       nickname: player?.nickname ?? null,
+      label: nameOf(room, seat),
       connected: player?.connected ?? false,
       isAi: !player || (!player.connected && room.fillWithAi),
       isYou: !!me && me.seat === seat,

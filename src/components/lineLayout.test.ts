@@ -366,7 +366,7 @@ describe("layoutLine", () => {
     }
   });
 
-  it("lays every tile on an arm along the chain, doubles included", () => {
+  it("lays doubles crosswise to the run", () => {
     const line: PlacedTile[] = [
       { left: 6, right: 6, seat: 0, opening: true }, // flat -> chain runs vertical
       { left: 6, right: 3, seat: 1 },
@@ -375,14 +375,13 @@ describe("layoutLine", () => {
     const items = layoutLine(line, 560);
     const nonDouble = items.find((i) => i.idx === 1)!;
     const double = items.find((i) => i.idx === 2)!;
-    // Only the spinner is crosswise. A double turned across a run reads as a
-    // stack rather than a link, so on the arms it lies in line like the rest.
-    expect(nonDouble.vertical).toBe(true);
-    expect(double.vertical).toBe(true);
+    expect(nonDouble.vertical).toBe(true); // along a vertical chain
+    expect(double.vertical).toBe(false); // crosswise
   });
 
-  it("never stacks a double beside the spinner", () => {
-    // The reported bug: opening on a mixed tile, then a double on the arm.
+  it("lays a double in line when it comes straight off a mixed opening", () => {
+    // The one exception. Crosswise here would put two wide tiles one atop the
+    // other, across the spinner itself, which reads as a stack not a join.
     const line: PlacedTile[] = [
       { left: 4, right: 5, seat: 0, opening: true },
       { left: 5, right: 5, seat: 1 },
@@ -398,6 +397,30 @@ describe("layoutLine", () => {
     // Their footprints must not overlap in the direction of the run.
     const openBottom = open.y + (open.vertical ? TILE_LONG : TILE_SHORT);
     expect(double.y).toBeGreaterThanOrEqual(openBottom - 0.01);
+  });
+
+  it("goes back to crosswise for the next double along that same arm", () => {
+    // Only the tile touching the spinner is special.
+    const line: PlacedTile[] = [
+      { left: 4, right: 5, seat: 0, opening: true },
+      { left: 5, right: 5, seat: 1 },
+      { left: 5, right: 2, seat: 2 },
+      { left: 2, right: 2, seat: 3 },
+    ];
+    const items = layoutLine(line, 560);
+    expect(items.find((i) => i.idx === 1)!.vertical).toBe(true); // in line
+    expect(items.find((i) => i.idx === 3)!.vertical).toBe(false); // crosswise
+  });
+
+  it("keeps doubles crosswise off a double opening, where nothing clashes", () => {
+    // Arms leave a double spinner from its middle, so there is no overlap to
+    // avoid and the exception does not apply.
+    const line: PlacedTile[] = [
+      { left: 5, right: 5, seat: 0, opening: true },
+      { left: 5, right: 5, seat: 1 },
+    ];
+    const items = layoutLine(line, 560);
+    expect(items.find((i) => i.idx === 1)!.vertical).toBe(false);
   });
 
   it("is stable for tiny tables (never loops forever)", () => {

@@ -77,16 +77,13 @@ function isHorizontalTravel(dir: Dir): boolean {
   return dir === "R" || dir === "L";
 }
 
-/**
- * Every tile on an arm lies along the chain, doubles included.
- *
- * Only the opening tile is crosswise, because it is the spinner. A double
- * turned across a run reads as a stack rather than a link — especially where
- * it lands right beside the spinner — so on the arms they lie in line like
- * everything else.
- */
-const ALONG = TILE_LONG;
-const ACROSS = TILE_SHORT;
+/** A double is crosswise: short along the chain, wide across it. */
+function extents(dbl: boolean) {
+  return {
+    along: dbl ? TILE_SHORT : TILE_LONG,
+    across: dbl ? TILE_LONG : TILE_SHORT,
+  };
+}
 
 interface Rect {
   x: number;
@@ -96,14 +93,15 @@ interface Rect {
 }
 
 /** Place a tile whose trailing edge sits at `cursor`, travelling in `dir`. */
-function rectFor(cursor: [number, number], dir: Dir): Rect {
+function rectFor(cursor: [number, number], dir: Dir, dbl: boolean): Rect {
+  const { along, across } = extents(dbl);
   const [cx, cy] = cursor;
   const travelH = isHorizontalTravel(dir);
   return {
-    x: dir === "R" ? cx : dir === "L" ? cx - ALONG : cx - ACROSS / 2,
-    y: dir === "D" ? cy : dir === "U" ? cy - ALONG : cy - ACROSS / 2,
-    w: travelH ? ALONG : ACROSS,
-    h: travelH ? ACROSS : ALONG,
+    x: dir === "R" ? cx : dir === "L" ? cx - along : cx - across / 2,
+    y: dir === "D" ? cy : dir === "U" ? cy - along : cy - across / 2,
+    w: travelH ? along : across,
+    h: travelH ? across : along,
   };
 }
 
@@ -141,21 +139,31 @@ function exceeds(r: Rect, dir: Dir, ring: Ring): boolean {
 
 /**
  * Turn the corner. `cursor` is where the chain leaves the previous tile — the
- * middle of the face it exits.
+ * middle of the face it exits. Two shapes, depending on the turning tile:
  *
- * A tile running *along* the new direction cannot lie flat against the face it
- * is turning off, so it tucks into the corner square instead, alongside the end
- * of the old run, making the familiar L.
+ *  - A tile running *along* the new direction cannot lie flat against the face
+ *    it is turning off. It tucks into the corner square instead, alongside the
+ *    end of the old run, making the familiar L.
+ *  - A crosswise double does sit squarely beyond that face, centred on it, and
+ *    the chain leaves from its far side.
  */
 function cornerCursor(
   cursor: [number, number],
   from: Dir,
   to: Dir,
-  prevAcross: number
+  prevAcross: number,
+  dbl: boolean
 ): [number, number] {
+  const { across, along } = extents(dbl);
+  if (dbl) {
+    return [
+      cursor[0] + VEC[from][0] * (across / 2) - VEC[to][0] * (along / 2),
+      cursor[1] + VEC[from][1] * (across / 2) - VEC[to][1] * (along / 2),
+    ];
+  }
   return [
-    cursor[0] - VEC[from][0] * (ACROSS / 2) + VEC[to][0] * (prevAcross / 2),
-    cursor[1] - VEC[from][1] * (ACROSS / 2) + VEC[to][1] * (prevAcross / 2),
+    cursor[0] - VEC[from][0] * (across / 2) + VEC[to][0] * (prevAcross / 2),
+    cursor[1] - VEC[from][1] * (across / 2) + VEC[to][1] * (prevAcross / 2),
   ];
 }
 
@@ -167,7 +175,9 @@ function walk(
   margin: number,
   forward: boolean,
   startAcross: number,
-  placed: Rect[]
+  placed: Rect[],
+  /** The opening tile is mixed, so a double leaving it lies in line. */
+  inLineOffSpinner: boolean
 ): LaidTile[] {
   const out: LaidTile[] = [];
   let cursor = startCursor;
@@ -181,12 +191,24 @@ function walk(
   let turns = 0;
   let prevAcross = startAcross;
 
-  for (const { p, idx } of tiles) {
+  tiles.forEach(({ p, idx }, position) => {
+    /**
+     * Doubles lie crosswise, with one exception.
+     *
+     * A double landing straight off a *mixed* opening tile would sit squarely
+     * across it, two wide tiles one atop the other, which reads as a stack
+     * rather than a join. In that one spot it lies in line instead. Off a
+     * double spinner there is no such clash, because the arms leave from the
+     * middle rather than from one half.
+     */
+    const dbl = p.left === p.right && !(position === 0 && inLineOffSpinner);
+    const { across, along } = extents(dbl);
+
     // Turn the corner if this tile would run off the table, or into the part of
     // the chain already on it. At most one turn per tile: a corner is measured
     // against the tile it turns off, so turning twice would offset the chain
     // from a tile that is not there and break the join.
-    let rect = rectFor(cursor, dir);
+    let rect = rectFor(cursor, dir, dbl);
     if (exceeds(rect, dir, ring) || collides(rect, placed)) {
       // A full lap done: coil inward so the chain never doubles back on itself.
       if (turns > 0 && turns % 4 === 0) {
@@ -197,10 +219,10 @@ function walk(
           bottom: ring.bottom - TILE_LONG,
         };
       }
-      cursor = cornerCursor(cursor, dir, CW[dir], prevAcross);
+      cursor = cornerCursor(cursor, dir, CW[dir], prevAcross, dbl);
       dir = CW[dir];
       turns++;
-      rect = rectFor(cursor, dir);
+      rect = rectFor(cursor, dir, dbl);
     }
 
     // On a table too small to coil a long chain cleanly, keep the tile on the
@@ -216,17 +238,17 @@ function walk(
       idx,
       x: rect.x,
       y: rect.y,
-      // Always along the run: upright on a vertical run, flat on a horizontal one.
-      vertical: !isHorizontalTravel(dir),
+      // Crosswise doubles stand upright on a horizontal run, flat on a vertical one.
+      vertical: isHorizontalTravel(dir) ? dbl : !dbl,
       reversed: forward ? dir === "L" || dir === "U" : dir === "R" || dir === "D",
       dir,
       arm: forward ? "fwd" : "bwd",
     });
     placed.push(rect);
 
-    cursor = [cursor[0] + VEC[dir][0] * ALONG, cursor[1] + VEC[dir][1] * ALONG];
-    prevAcross = ACROSS;
-  }
+    cursor = [cursor[0] + VEC[dir][0] * along, cursor[1] + VEC[dir][1] * along];
+    prevAcross = across;
+  });
 
   return out;
 }
@@ -297,8 +319,16 @@ export function layoutLine(
   const openAcross = TILE_SHORT;
   const placed: Rect[] = [{ x: c - w / 2, y: c - h / 2, w, h }];
 
-  items.push(...walk(after, fwdStart, fwdDir, size, margin, true, openAcross, placed));
-  items.push(...walk(before, bwdStart, bwdDir, size, margin, false, openAcross, placed));
+  // Off a mixed opening the two arms leave from its halves, so a crosswise
+  // double there would sit across the spinner itself. Off a double they leave
+  // from the middle and there is nothing to clash with.
+  const mixedOpening = !openDouble;
+  items.push(
+    ...walk(after, fwdStart, fwdDir, size, margin, true, openAcross, placed, mixedOpening)
+  );
+  items.push(
+    ...walk(before, bwdStart, bwdDir, size, margin, false, openAcross, placed, mixedOpening)
+  );
 
   return items;
 }

@@ -85,6 +85,12 @@ export interface PlayerView {
   seats: {
     seat: Seat;
     nickname: string | null;
+    /**
+     * What to call this seat out loud. A nickname if someone is there, and
+     * otherwise the computer named by its seat — three players all called
+     * "Computer" makes the move log useless.
+     */
+    label: string;
     connected: boolean;
     isAi: boolean;
     isYou: boolean;

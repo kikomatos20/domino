@@ -75,7 +75,7 @@ export default function OnlineTable({
   const whoseTurn = seat(game.currentSeat);
   const turnName = whoseTurn.isYou
     ? "Your turn"
-    : `${whoseTurn.nickname ?? "Computer"}'s turn`;
+    : `${whoseTurn.label}'s turn`;
 
   // Announce each tile as it lands, so you can follow a batch of moves that
   // arrived together.
@@ -111,7 +111,7 @@ export default function OnlineTable({
 
   const played = useFading(replay.justPlayed, 1500);
   const playedBanner = played
-    ? `${seat(played.seat).isYou ? "You" : (seat(played.seat).nickname ?? "Computer")} played ${Math.min(played.left, played.right)} | ${Math.max(played.left, played.right)}`
+    ? `${seat(played.seat).isYou ? "You" : seat(played.seat).label} played ${Math.min(played.left, played.right)} | ${Math.max(played.left, played.right)}`
     : null;
 
   return (
@@ -155,7 +155,7 @@ export default function OnlineTable({
               ? game.mustOpenWithDoubleSix
                 ? "You open with the double six"
                 : "You open this round"
-              : `${seat(game.opener).nickname ?? "Computer"} opens${
+              : `${seat(game.opener).label} opens${
                   game.mustOpenWithDoubleSix ? " with the double six" : ""
                 }`}
           </div>
@@ -210,7 +210,7 @@ export default function OnlineTable({
               <>
                 <h2>
                   {game.roundOver.kind === "domino" &&
-                    `${seat(game.roundOver.winnerSeat!).isYou ? "You" : seat(game.roundOver.winnerSeat!).nickname ?? "Computer"} dominoed!`}
+                    `${seat(game.roundOver.winnerSeat!).isYou ? "You" : seat(game.roundOver.winnerSeat!).label} dominoed!`}
                   {game.roundOver.kind === "blocked" && "Game blocked (tranca)"}
                   {game.roundOver.kind === "tie" && "Blocked — dead tie, no points"}
                 </h2>
@@ -291,7 +291,7 @@ function OnlineSeat({
   return (
     <div className="seat-info">
       <span className="seat-name">
-        {info.nickname ?? "Computer"}
+        {info.label}
         {partner ? " (partner)" : ""}
         {info.nickname && !info.connected ? " · away" : ""}
         {reveal !== undefined && reveal.length > 0 && (
