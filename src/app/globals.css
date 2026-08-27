@@ -1899,6 +1899,9 @@ body {
   }
 }
 
+/* Above everything the table draws — the chat dock (120), the drop targets
+   (150) and the dragged tile (200). A dialog that game furniture can paint over
+   is not a dialog. */
 .overlay {
   position: fixed;
   inset: 0;
@@ -1906,7 +1909,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 220;
 }
 
 .dialog {

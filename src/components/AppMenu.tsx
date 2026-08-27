@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -34,6 +35,9 @@ export default function AppMenu({
   const [account, setAccount] = useState<Account | null>(null);
   /** Where they asked to go, held while we check they meant it. */
   const [leavingTo, setLeavingTo] = useState<string | null>(null);
+  /** Portals need a document, which the server render does not have. */
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   /**
    * Follow a link, or stop and ask first.
@@ -65,6 +69,17 @@ export default function AppMenu({
     return () => window.removeEventListener("keydown", key);
   }, [open]);
 
+  /**
+   * Dialogs go straight to the body.
+   *
+   * This button lives in the scoreboard, and a `position: fixed` overlay
+   * rendered there is still subject to any ancestor that creates a stacking
+   * context or a containing block — which is how the tiles ended up painted on
+   * top of the menu. A portal steps outside all of it.
+   */
+  const portal = (node: React.ReactNode) =>
+    mounted ? createPortal(node, document.body) : null;
+
   return (
     <>
       <button
@@ -87,7 +102,7 @@ export default function AppMenu({
         )}
       </button>
 
-      {open && (
+      {open && portal(
         <div className="overlay" onClick={() => setOpen(false)}>
           <nav className="dialog app-menu" onClick={(e) => e.stopPropagation()}>
             <header className="app-menu-head">
@@ -151,7 +166,7 @@ export default function AppMenu({
         </div>
       )}
 
-      {leavingTo && (
+      {leavingTo && portal(
         <div className="overlay" onClick={() => setLeavingTo(null)}>
           <div className="dialog" onClick={(e) => e.stopPropagation()}>
             <h2>Leave the table?</h2>
