@@ -754,6 +754,19 @@ body {
   opacity: 0.5;
 }
 
+.stats-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+/* Matches above, rounds below — same block, two different units. */
+.stats-list li.stats-divider {
+  margin-top: 6px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
 /* A bar per day. No axes, no library, nothing to misread. */
 .trend {
   display: flex;
