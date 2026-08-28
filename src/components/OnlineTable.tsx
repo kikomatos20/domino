@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { End, GameState, Seat, TileId } from "@/engine/types";
 import type { PlayerView } from "@/server/types";
 import Board from "./Board";
@@ -8,6 +8,9 @@ import AppMenu from "./AppMenu";
 import CapicuaMoment from "./CapicuaMoment";
 import TauntPrompt from "./TauntPrompt";
 import { closingPlay } from "@/engine/engine";
+import { statsFor } from "@/engine/roundStats";
+import { earnedInRound } from "@/engine/achievements";
+import { fetchRecord } from "@/lib/auth";
 import type { EndAnchors } from "./Board";
 import DominoTile from "./DominoTile";
 import FeedbackButton from "./FeedbackButton";
@@ -130,6 +133,65 @@ export default function OnlineTable({
    */
   const [capicuaSeen, setCapicuaSeen] = useState(false);
   useEffect(() => setCapicuaSeen(false), [game.roundNumber]);
+
+  /**
+   * Achievements you have already got, loaded once when the table opens.
+   *
+   * Held in a ref rather than fetched per round: everything needed to judge a
+   * round is on this page already, and the only thing the server knows that we
+   * do not is what came before tonight.
+   */
+  const earned = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchRecord().then((data) => {
+      if (cancelled || !data) return;
+      earned.current = new Set(
+        data.stats.achievements.filter((a) => a.earnedAt).map((a) => a.id)
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /**
+   * Say so in the chat when a round earns something new.
+   *
+   * Only where it counts: achievements are for games against people, so a
+   * table of computers announces nothing rather than promising a record that
+   * will never be written.
+   */
+  const announced = useRef<number | null>(null);
+  useEffect(() => {
+    if (!game.roundOver || announced.current === game.roundNumber) return;
+    if (!earned.current) return;
+
+    const humans = view.seats.filter((s) => s.nickname).length;
+    if (humans < 2) return;
+
+    announced.current = game.roundNumber;
+
+    // Everything needed is already on this page — the history arrives with the
+    // finished round, so judging it costs no request at all.
+    const stat = statsFor(
+      {
+        matchId: "",
+        roundNumber: game.roundNumber,
+        opener: game.opener,
+        history: game.history,
+        roundOver: game.roundOver,
+      },
+      you
+    );
+    if (!stat) return;
+
+    const fresh = earnedInRound(stat, earned.current);
+    for (const a of fresh) {
+      earned.current.add(a.id);
+      onChat(`🏅 ${a.name}`);
+    }
+  }, [game.roundOver, game.roundNumber, game.opener, game.history, view.seats, you, onChat]);
 
   /**
    * A move held back so its player can say something first.

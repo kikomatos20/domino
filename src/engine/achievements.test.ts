@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { achievementsFor, nextUp } from "./achievements";
+import { achievementsFor, earnedInRound, nextUp } from "./achievements";
 import type { AchievementMatch, AchievementRound } from "./achievements";
 
 const match = (over: Partial<AchievementMatch> = {}): AchievementMatch => ({
@@ -133,6 +133,38 @@ describe("achievements", () => {
     );
     // Two of three wins is closer than anything untouched.
     expect(nextUp(list)?.id).toBe("hat-trick");
+  });
+
+  it("spots what a single round earned, without the rest of your history", () => {
+    const fresh = earnedInRound(round({ capicua: true, dominoed: true }), new Set());
+    expect(fresh.map((a) => a.id)).toEqual(
+      expect.arrayContaining(["capicua", "dominoed"])
+    );
+  });
+
+  it("stays quiet about something already earned", () => {
+    const already = new Set(["capicua", "dominoed"]);
+    expect(earnedInRound(round({ capicua: true, dominoed: true }), already)).toEqual([]);
+  });
+
+  it("does not announce a clean hand for a round with nothing decided", () => {
+    const forced = earnedInRound(
+      round({ decided: 0, mistakes: 0, inaccuracies: 0 }),
+      new Set()
+    );
+    expect(forced.map((a) => a.id)).not.toContain("clean");
+  });
+
+  it("agrees with the full history version on the same round", () => {
+    // The two paths must not drift: one judges a round on its own, the other
+    // judges a lifetime, and they have to reach the same verdict.
+    const one = round({ capicua: true, dominoed: true, closed: false });
+    const live = earnedInRound(one, new Set()).map((a) => a.id).sort();
+    const history = achievementsFor([], [one])
+      .filter((a) => a.earnedAt && a.id !== "partnership" && a.id !== "hat-trick")
+      .map((a) => a.id)
+      .sort();
+    expect(live).toEqual(history);
   });
 
   it("has nothing to suggest once everything is earned", () => {

@@ -10,7 +10,22 @@
 import { reviewRound } from "./review";
 import { roleOf } from "./roles";
 import { teamOf } from "./engine";
-import type { GameState, Seat } from "./types";
+import type { MoveRecord, RoundResult, Seat } from "./types";
+
+/**
+ * The parts of a finished round these figures are drawn from.
+ *
+ * Narrower than a whole GameState on purpose: the server has the full state,
+ * while a player's browser only ever holds the redacted view. Both can satisfy
+ * this, so the same code produces the same numbers on either side.
+ */
+export interface RoundSource {
+  matchId: string;
+  roundNumber: number;
+  opener: Seat;
+  history: MoveRecord[];
+  roundOver: RoundResult | null;
+}
 
 export interface RoundStat {
   /** The match this round was part of. */
@@ -41,7 +56,7 @@ export interface RoundStat {
  * Pure, so the solo game can call it in the browser and the server can call it
  * for an online table, and both produce the same shape.
  */
-export function statsFor(game: GameState, seat: Seat): RoundStat | null {
+export function statsFor(game: RoundSource, seat: Seat): RoundStat | null {
   const over = game.roundOver;
   if (!over) return null;
 

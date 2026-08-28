@@ -190,6 +190,43 @@ export function achievementsFor(
   ];
 }
 
+/**
+ * Which achievements a single finished round would qualify for.
+ *
+ * Deliberately separate from `achievementsFor`, which needs your whole history.
+ * A table can run this on the round it just watched, with no request and no
+ * knowledge of anything else — the caller supplies what has already been
+ * earned, so nothing announces itself twice.
+ *
+ * Only covers the round-shaped ones. Match achievements are settled when a
+ * match ends, by which point the page has fetched fresh totals anyway.
+ */
+export function earnedInRound(
+  round: Omit<AchievementRound, "finishedAt">,
+  already: ReadonlySet<string>
+): { id: string; name: string }[] {
+  const qualifies: { id: string; name: string }[] = [];
+  const add = (id: string, name: string, won: boolean) => {
+    if (won && !already.has(id)) qualifies.push({ id, name });
+  };
+
+  add("dominoed", "Dominoed", round.dominoed);
+  add("capicua", "Capicúa", round.capicua);
+  add("tranca", "La tranca", round.closed && round.closedWon);
+  add("pie", "Last shall be first", round.won && round.roleAtStart === "pie");
+  add(
+    "clean",
+    "Clean hand",
+    round.decided >= 3 && round.mistakes === 0 && round.inaccuracies === 0
+  );
+  add("sharp", "Sharp", (round.accuracy ?? 0) >= 90);
+  add("in-step", "In step", round.decided >= 3 && round.engineAgreement === 100);
+  add("fourteen-tiles", "Fourteen tiles", round.teamPlay === 100);
+  add("light", "Nearly out", !round.won && round.pipsLeft <= 3);
+
+  return qualifies;
+}
+
 /** The nearest one not yet earned, for a "next up" line. */
 export function nextUp(list: Achievement[]): Achievement | null {
   const open = list.filter((a) => !a.earnedAt);
