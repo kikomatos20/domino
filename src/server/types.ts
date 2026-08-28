@@ -54,6 +54,12 @@ export interface Room {
   game?: GameState;
   /** Table talk and the run of play, oldest first. */
   chat: ChatEntry[];
+  /**
+   * Accounts the host has removed. Only signed-in players can be kept out —
+   * a guest has nothing stable to recognise them by, so a kick is a request
+   * to leave rather than a lock on the door.
+   */
+  banned?: string[];
   version: number;
   updatedAt: number;
 }

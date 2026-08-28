@@ -276,6 +276,7 @@ export default function RoomClient({ code }: { code: string }) {
         busy={busy}
         onSeat={(seat: Seat) => send({ action: "seat", seat })}
         onAskSwap={(seat: Seat) => send({ action: "askSwap", seat })}
+        onKick={(seat: Seat) => send({ action: "kick", seat })}
         onAnswerSwap={(accept: boolean) => send({ action: "answerSwap", accept })}
         onSettings={(s) => send({ action: "settings", ...s })}
         onStart={() => send({ action: "start" })}

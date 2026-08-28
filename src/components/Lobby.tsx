@@ -26,12 +26,15 @@ export default function Lobby({
   onChat,
   onAskSwap,
   onAnswerSwap,
+  onKick,
   busy,
 }: {
   view: PlayerView;
   onSeat: (seat: Seat) => void;
   onAskSwap: (seat: Seat) => void;
   onAnswerSwap: (accept: boolean) => void;
+  /** Host only, lobby only. */
+  onKick: (seat: Seat) => void;
   onSettings: (s: { fillWithAi?: boolean; difficulty?: string }) => void;
   onStart: () => void;
   onChat: (text: string) => void;
@@ -87,6 +90,21 @@ export default function Lobby({
               {!s.nickname && view.you && (
                 <button className="seat-take" disabled={busy} onClick={() => onSeat(s.seat)}>
                   Sit here
+                </button>
+              )}
+
+              {/* The host can clear a seat before the match starts. */}
+              {isHost && s.nickname && !s.isYou && (
+                <button
+                  className="seat-kick"
+                  disabled={busy}
+                  title={`Remove ${s.nickname}`}
+                  aria-label={`Remove ${s.nickname}`}
+                  onClick={() => {
+                    if (confirm(`Remove ${s.nickname} from the table?`)) onKick(s.seat);
+                  }}
+                >
+                  ×
                 </button>
               )}
 

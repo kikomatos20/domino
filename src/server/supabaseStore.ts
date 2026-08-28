@@ -39,6 +39,7 @@ interface RoomRow {
   host_token: string;
   version: number;
   chat: ChatEntry[] | null;
+  banned: string[] | null;
   updated_at: string;
 }
 
@@ -136,6 +137,7 @@ export function createSupabaseStore(): RoomStore & {
         })),
         game: game?.state ?? undefined,
         chat: room.chat ?? [],
+        banned: room.banned ?? [],
         // Lives on the room, so it is meaningful in the lobby too.
         version: room.version ?? 0,
         updatedAt: new Date(room.updated_at).getTime(),
@@ -204,6 +206,7 @@ export function createSupabaseStore(): RoomStore & {
         // No game means no game: without this the finished match would be read
         // straight back out and the table would reappear over the lobby.
         p_clear_state: !room.game,
+        p_banned: room.banned ?? [],
       });
       if (error) throw error;
     },

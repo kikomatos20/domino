@@ -210,6 +210,9 @@ export async function joinRoom(
 ): Promise<{ room: Room; token: string }> {
   const room = await mustGet(store, code);
   if (room.status !== "lobby") throw new RoomError("That game has already started", 409);
+  if (userId && (room.banned ?? []).includes(userId)) {
+    throw new RoomError("The host removed you from this table", 403);
+  }
 
   const open = freeSeats(room);
   if (open.length === 0) throw new RoomError("That room is full", 409);
@@ -259,6 +262,49 @@ export async function takeSeat(
     seat,
     who: player.nickname,
     text: `${player.nickname} moved to ${SEAT_NAME[seat]}`,
+  });
+  await save(store, room);
+  return room;
+}
+
+/**
+ * Remove someone from the table.
+ *
+ * The lobby only. Mid-match there is no good outcome: their seat either stalls
+ * the game or is quietly handed to the computer, and either way the other three
+ * lose the match they were playing. If someone has to go mid-game, finish or
+ * return to the lobby first.
+ */
+export async function kickPlayer(
+  store: RoomStore,
+  code: string,
+  token: string,
+  seat: Seat
+): Promise<Room> {
+  const room = await mustGet(store, code);
+  if (token !== room.hostToken) throw new RoomError("Only the host can do that", 403);
+  if (room.status !== "lobby") {
+    throw new RoomError("You can only do that before the match starts", 409);
+  }
+
+  const target = room.players.find((p) => p.seat === seat);
+  if (!target) throw new RoomError("Nobody is sitting there", 409);
+  if (target.token === room.hostToken) throw new RoomError("You cannot remove yourself");
+
+  room.players = room.players.filter((p) => p.token !== target.token);
+
+  // Only an account can actually be kept out. A guest can walk back in under
+  // another nickname, and pretending otherwise would be worse than saying so.
+  if (target.userId) {
+    room.banned = [...new Set([...(room.banned ?? []), target.userId])];
+  }
+
+  clearSwaps(room);
+  say(room, {
+    kind: "event",
+    seat: null,
+    who: "",
+    text: `${target.nickname} was removed from the table`,
   });
   await save(store, room);
   return room;

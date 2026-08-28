@@ -3,6 +3,7 @@ import { createMemoryStore } from "./memoryStore";
 import {
   createRoom,
   joinRoom,
+  kickPlayer,
   leaveRoom,
   markReady,
   playMove,
@@ -333,6 +334,74 @@ describe("disconnections", () => {
 
     const after = await get(code);
     expect(after.game!.currentSeat).toBe(seat); // waits for them to return
+  });
+});
+
+describe("the host clearing a seat", () => {
+  it("removes them and frees the seat", async () => {
+    const { room, token } = await createRoom(store, { nickname: "Kiko" });
+    const ana = await joinRoom(store, room.code, "Ana");
+    const seat = (await get(room.code)).players.find((p) => p.token === ana.token)!.seat;
+
+    await kickPlayer(store, room.code, token, seat);
+
+    const after = await get(room.code);
+    expect(after.players.map((p) => p.nickname)).toEqual(["Kiko"]);
+    // The seat is open again, so somebody else can take it.
+    expect(after.players.some((p) => p.seat === seat)).toBe(false);
+  });
+
+  it("only the host can do it", async () => {
+    const { room } = await createRoom(store, { nickname: "Kiko" });
+    const ana = await joinRoom(store, room.code, "Ana");
+    await joinRoom(store, room.code, "Beto");
+    await expect(kickPlayer(store, room.code, ana.token, 0)).rejects.toBeInstanceOf(
+      RoomError
+    );
+  });
+
+  it("refuses once the match has started", async () => {
+    const { code, tokens } = await fourPlayers();
+    await startMatch(store, code, tokens[0]);
+    // Mid-match there is no good outcome: the seat either stalls the table or
+    // is handed to the computer, and the other three lose their game either way.
+    await expect(kickPlayer(store, code, tokens[0], 1)).rejects.toBeInstanceOf(RoomError);
+  });
+
+  it("will not let the host remove themselves", async () => {
+    const { room, token } = await createRoom(store, { nickname: "Kiko" });
+    await expect(kickPlayer(store, room.code, token, 0)).rejects.toBeInstanceOf(RoomError);
+  });
+
+  it("keeps a signed-in player out afterwards", async () => {
+    const { room, token } = await createRoom(store, { nickname: "Kiko" });
+    await joinRoom(store, room.code, "Ana", undefined, "user-ana");
+    await kickPlayer(store, room.code, token, 1);
+
+    await expect(
+      joinRoom(store, room.code, "Ana", undefined, "user-ana")
+    ).rejects.toBeInstanceOf(RoomError);
+    // A different account is unaffected.
+    await expect(
+      joinRoom(store, room.code, "Beto", undefined, "user-beto")
+    ).resolves.toBeTruthy();
+  });
+
+  it("cannot keep a guest out, and does not pretend to", async () => {
+    // Nothing stable identifies a guest, so this is honest rather than fixed:
+    // a kicked guest holding the code can walk back in.
+    const { room, token } = await createRoom(store, { nickname: "Kiko" });
+    await joinRoom(store, room.code, "Ana");
+    await kickPlayer(store, room.code, token, 1);
+    await expect(joinRoom(store, room.code, "Ana")).resolves.toBeTruthy();
+  });
+
+  it("says so at the table", async () => {
+    const { room, token } = await createRoom(store, { nickname: "Kiko" });
+    await joinRoom(store, room.code, "Ana");
+    await kickPlayer(store, room.code, token, 1);
+    const said = (await get(room.code)).chat.map((c) => c.text).join(" | ");
+    expect(said).toMatch(/Ana was removed/);
   });
 });
 

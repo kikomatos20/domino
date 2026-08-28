@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   heartbeat,
+  kickPlayer,
   leaveRoom,
   markReady,
   playMove,
@@ -46,6 +47,10 @@ export async function POST(
       }
       case "answerSwap": {
         const room = await respondSwap(store, code, token, body.accept === true);
+        return NextResponse.json({ view: viewFor(room, token) });
+      }
+      case "kick": {
+        const room = await kickPlayer(store, code, token, Number(body.seat) as Seat);
         return NextResponse.json({ view: viewFor(room, token) });
       }
       case "settings": {
