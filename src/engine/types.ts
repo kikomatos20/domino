@@ -78,6 +78,14 @@ export interface MoveRecord {
 }
 
 export interface GameState {
+  /**
+   * Identifies this match, from the first deal to the hundredth point.
+   *
+   * Rounds restart their numbering every match, so without this a room played
+   * twice produces two rounds called "round 1" with nothing to tell them apart.
+   * It also makes a double-recorded result detectable rather than invisible.
+   */
+  matchId: string;
   hands: [TileId[], TileId[], TileId[], TileId[]];
   line: PlacedTile[];
   leftEnd: number | null;

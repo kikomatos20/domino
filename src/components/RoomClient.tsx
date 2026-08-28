@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { act, fetchView, joinRoom, saveNickname, savedNickname, savedToken } from "@/lib/client";
+import {
+  act,
+  fetchView,
+  joinRoom,
+  saveNickname,
+  savedNickname,
+  savedToken,
+} from "@/lib/client";
+import { useRouter } from "next/navigation";
 import type { PlayerView } from "@/server/types";
 import type { End, Seat, TileId } from "@/engine/types";
 import Lobby from "./Lobby";
@@ -17,6 +25,7 @@ import { pollDelay } from "@/lib/pollSchedule";
 const PING_MS = 30000;
 
 export default function RoomClient({ code }: { code: string }) {
+  const router = useRouter();
   const [view, setView] = useState<PlayerView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fatal, setFatal] = useState<string | null>(null);
@@ -287,6 +296,7 @@ export default function RoomClient({ code }: { code: string }) {
       fromStart={sawLobby.current}
       onReady={(ready: boolean) => send({ action: "ready", ready })}
       onChat={(text: string) => send({ action: "chat", text })}
+      onLobby={() => send({ action: "lobby" })}
     />
   );
 }

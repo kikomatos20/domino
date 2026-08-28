@@ -579,6 +579,39 @@ async function dealNextRound(
   return room;
 }
 
+/**
+ * Back to the lobby for another match, with the same people in the same seats.
+ *
+ * Only once a match is actually over — this is a rematch, not a way to walk out
+ * of a game somebody is losing.
+ */
+export async function returnToLobby(
+  store: RoomStore,
+  code: string,
+  token: string
+): Promise<Room> {
+  const room = await mustGet(store, code);
+  const player = requirePlayer(room, token);
+  const game = requireGame(room);
+  if (!game.matchOver) throw new RoomError("The match is still going", 409);
+
+  room.status = "lobby";
+  room.game = undefined;
+  for (const p of room.players) {
+    p.ready = false;
+    p.wantsSeat = null;
+  }
+
+  say(room, {
+    kind: "event",
+    seat: player.seat,
+    who: player.nickname,
+    text: `${player.nickname} took the table back to the lobby — same seats, new match`,
+  });
+  await save(store, room);
+  return room;
+}
+
 /** A line of table talk from a seated player. */
 export async function postChat(
   store: RoomStore,

@@ -33,6 +33,7 @@ export default function OnlineTable({
   onPass,
   onReady,
   onChat,
+  onLobby,
   fromStart,
   busy,
   error,
@@ -44,6 +45,8 @@ export default function OnlineTable({
   onPass: () => void;
   onReady: (ready: boolean) => void;
   onChat: (text: string) => void;
+  /** Take the whole table back to the lobby for another match. */
+  onLobby: () => void;
   busy: boolean;
   error: string | null;
 }) {
@@ -268,8 +271,17 @@ export default function OnlineTable({
                 <button className="secondary" onClick={openReview}>
                   Review your play
                 </button>
-                <a className="home-button" href="/online">
-                  Back to lobby
+
+                {/* Same room, same seats, fresh match — the usual next thing
+                    after a game ends with everyone still sitting there. */}
+                {/* Back to the lobby they already know, with the seats still
+                    theirs to rearrange. Nobody has to share a code again. */}
+                <button disabled={busy} onClick={onLobby}>
+                  Play again — back to the lobby
+                </button>
+
+                <a className="home-button secondary" href="/">
+                  Home
                 </a>
               </>
             ) : (

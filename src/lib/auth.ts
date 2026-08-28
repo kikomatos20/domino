@@ -229,6 +229,7 @@ export async function reportSolo(result: {
   teamScore: number;
   opponentScore: number;
   rounds: number;
+  matchId: string;
 }): Promise<void> {
   try {
     const headers = await authHeaders();

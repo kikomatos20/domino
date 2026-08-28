@@ -71,6 +71,7 @@ export async function POST(request: Request) {
       teamScore,
       opponentScore,
       rounds,
+      matchId: typeof body?.matchId === "string" ? body.matchId : undefined,
     });
     return NextResponse.json({ ok: true });
   } catch (error) {

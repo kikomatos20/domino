@@ -61,6 +61,7 @@ export async function recordMatch(room: Room, game: GameState): Promise<void> {
       return {
         user_id: p.userId as string,
         room_code: room.code,
+        match_id: game.matchId,
         won: game.matchScore[team] > game.matchScore[1 - team],
         team_score: game.matchScore[team],
         opponent_score: game.matchScore[1 - team],
@@ -83,13 +84,20 @@ export async function recordMatch(room: Room, game: GameState): Promise<void> {
 /** Record a solo match, reported by the browser that played it. */
 export async function recordSolo(
   userId: string,
-  result: { won: boolean; teamScore: number; opponentScore: number; rounds: number }
+  result: {
+    won: boolean;
+    teamScore: number;
+    opponentScore: number;
+    rounds: number;
+    matchId?: string;
+  }
 ): Promise<void> {
   const db = admin();
   if (!db) return;
   await db.from("match_results").insert({
     user_id: userId,
     room_code: null,
+    match_id: result.matchId ?? null,
     won: result.won,
     team_score: result.teamScore,
     opponent_score: result.opponentScore,

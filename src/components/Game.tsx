@@ -99,7 +99,12 @@ export default function Game() {
     reported.current = true;
     const us = state.matchScore[0];
     const them = state.matchScore[1];
-    reportSolo({ teamScore: us, opponentScore: them, rounds: state.roundNumber });
+    reportSolo({
+      teamScore: us,
+      opponentScore: them,
+      rounds: state.roundNumber,
+      matchId: state.matchId,
+    });
   }, [state?.matchOver, state?.matchScore, state?.roundNumber]);
 
   // Keep the finished round's history available for review.
@@ -279,7 +284,20 @@ export default function Game() {
                 <button className="secondary" onClick={() => setReviewing(true)}>
                   Review your play
                 </button>
-                <button onClick={() => setState(newMatch())}>New match</button>
+                <button
+                  onClick={() => {
+                    // A fresh match is a fresh slate for the reporting guards.
+                    reported.current = false;
+                    reportedRound.current = null;
+                    setCapicuaRound(null);
+                    setState(newMatch());
+                  }}
+                >
+                  New match
+                </button>
+                <a className="home-button secondary" href="/">
+                  Home
+                </a>
               </>
             ) : (
               <>

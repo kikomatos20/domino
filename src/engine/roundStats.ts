@@ -13,6 +13,8 @@ import { teamOf } from "./engine";
 import type { GameState, Seat } from "./types";
 
 export interface RoundStat {
+  /** The match this round was part of. */
+  matchId: string;
   roundNumber: number;
   seat: Seat;
   roleAtStart: string;
@@ -52,6 +54,7 @@ export function statsFor(game: GameState, seat: Seat): RoundStat | null {
   const closed = over.kind !== "domino" && lastPlay?.seat === seat;
 
   return {
+    matchId: game.matchId,
     roundNumber: game.roundNumber,
     seat,
     roleAtStart: roleOf(seat, game.opener),

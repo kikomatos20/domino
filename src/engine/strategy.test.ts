@@ -6,8 +6,10 @@ import {
   isCapicua,
   legalMoves,
   newMatch,
+  nextRound,
   stateFromSnapshot,
 } from "./engine";
+import { statsFor as roundStatsFor } from "./roundStats";
 import { blockedMargin, chooseMove, forcesBlock, phaseOf, readTable, scoreMoves } from "./ai";
 import { leadShifts, manoAt, roleOf } from "./roles";
 import { reviewRound } from "./review";
@@ -226,6 +228,50 @@ describe("playing for the tranca", () => {
       }
     });
     expect(sawReason).toBe(true);
+  });
+});
+
+describe("identifying a match", () => {
+  it("gives every match its own id", () => {
+    const a = newMatch(seededRng(1));
+    const b = newMatch(seededRng(2));
+    expect(a.matchId).not.toBe(b.matchId);
+    expect(a.matchId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+  });
+
+  it("keeps the same id across every round of one match", () => {
+    let state = newMatch(seededRng(7));
+    const id = state.matchId;
+    let guard = 0;
+    while (!state.roundOver && guard++ < 80) {
+      const seat = state.currentSeat;
+      const move = chooseMove(state, seat, { difficulty: "medium", deterministic: true });
+      state = move ? applyMove(state, seat, move) : applyPass(state, seat);
+    }
+    expect(state.matchId).toBe(id);
+    if (!state.matchOver) {
+      const next = nextRound(state, seededRng(8));
+      // A new deal, the same match — this is what lets rounds be grouped.
+      expect(next.roundNumber).toBe(2);
+      expect(next.matchId).toBe(id);
+    }
+  });
+
+  it("stays reproducible under a seeded deal", () => {
+    expect(newMatch(seededRng(42)).matchId).toBe(newMatch(seededRng(42)).matchId);
+  });
+
+  it("carries the id onto every round's stats", () => {
+    let state = newMatch(seededRng(11));
+    let guard = 0;
+    while (!state.roundOver && guard++ < 80) {
+      const seat = state.currentSeat;
+      const move = chooseMove(state, seat, { difficulty: "medium", deterministic: true });
+      state = move ? applyMove(state, seat, move) : applyPass(state, seat);
+    }
+    expect(roundStatsFor(state, 0)!.matchId).toBe(state.matchId);
   });
 });
 

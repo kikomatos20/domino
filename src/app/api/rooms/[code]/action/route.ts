@@ -8,6 +8,7 @@ import {
   postChat,
   requestSwap,
   respondSwap,
+  returnToLobby,
   startMatch,
   takeSeat,
   updateSettings,
@@ -74,6 +75,10 @@ export async function POST(
       }
       case "pass": {
         const room = await playPass(store, code, token);
+        return NextResponse.json({ view: viewFor(room, token) });
+      }
+      case "lobby": {
+        const room = await returnToLobby(store, code, token);
         return NextResponse.json({ view: viewFor(room, token) });
       }
       case "chat": {

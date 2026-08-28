@@ -201,6 +201,9 @@ export function createSupabaseStore(): RoomStore & {
         })),
         p_state: room.game ?? null,
         p_chat: room.chat ?? [],
+        // No game means no game: without this the finished match would be read
+        // straight back out and the table would reappear over the lobby.
+        p_clear_state: !room.game,
       });
       if (error) throw error;
     },

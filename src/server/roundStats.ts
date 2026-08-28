@@ -31,6 +31,7 @@ function row(userId: string, roomCode: string | null, stat: RoundStat, humans: n
   return {
     user_id: userId,
     room_code: roomCode,
+    match_id: stat.matchId,
     humans,
     round_number: stat.roundNumber,
     seat: stat.seat,

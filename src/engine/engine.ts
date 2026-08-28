@@ -75,11 +75,32 @@ function deal(rng: Rng): [TileId[], TileId[], TileId[], TileId[]] {
   return [ids.slice(0, 7), ids.slice(7, 14), ids.slice(14, 21), ids.slice(21, 28)];
 }
 
+/**
+ * A v4-shaped id for one match.
+ *
+ * Drawn from the same random source the deal uses, so a seeded run stays
+ * reproducible — `crypto.randomUUID` would make every test replay different.
+ */
+function makeMatchId(rng: Rng): string {
+  const bytes = Array.from({ length: 16 }, () => Math.floor(rng() * 256));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant
+  const hex = bytes.map((b) => b.toString(16).padStart(2, "0"));
+  return [
+    hex.slice(0, 4).join(""),
+    hex.slice(4, 6).join(""),
+    hex.slice(6, 8).join(""),
+    hex.slice(8, 10).join(""),
+    hex.slice(10, 16).join(""),
+  ].join("-");
+}
+
 /** Start a brand-new match (round 1: holder of 6-6 opens with it). */
 export function newMatch(rng: Rng = Math.random, target = TARGET_SCORE): GameState {
   const hands = deal(rng);
   const opener = hands.findIndex((h) => h.includes("6-6")) as Seat;
   return {
+    matchId: makeMatchId(rng),
     hands,
     line: [],
     leftEnd: null,
@@ -150,6 +171,8 @@ export function stateFromSnapshot(
   target = TARGET_SCORE
 ): GameState {
   return {
+    // A rebuilt position is for analysis, not a match anyone is playing.
+    matchId: "",
     hands: before.hands.map((h) => [...h]) as GameState["hands"],
     line: before.line.map((t) => ({ ...t })),
     leftEnd: before.leftEnd,
