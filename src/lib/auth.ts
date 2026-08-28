@@ -193,6 +193,7 @@ export interface RoundTotals {
 }
 
 export interface Stats {
+  achievements: import("@/engine/achievements").Achievement[];
   online: Tally;
   solo: Tally;
   partners: { name: string; played: number; won: number }[];

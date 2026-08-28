@@ -1,5 +1,7 @@
 "use client";
 
+import { nextUp } from "@/engine/achievements";
+import type { Achievement } from "@/engine/achievements";
 import type { RoundTotals, Stats, Tally } from "@/lib/auth";
 
 /**
@@ -61,8 +63,55 @@ export default function StatsPanel({ stats }: { stats: Stats }) {
         )}
       </section>
 
+      <Achievements list={stats.achievements} />
+
       <Trend rounds={stats.onlineRounds} solo={stats.soloRounds} />
     </div>
+  );
+}
+
+/**
+ * Earned against people only.
+ *
+ * Shown whether earned or not, so you can see what there is to go after — and
+ * the one nearest to hand is called out, because a wall of locked badges tells
+ * you less than a single reachable target.
+ */
+function Achievements({ list }: { list: Achievement[] }) {
+  const earned = list.filter((a) => a.earnedAt);
+  const next = nextUp(list);
+
+  return (
+    <section className="stats-block">
+      <h3>
+        Achievements <span className="stats-figure">{earned.length}/{list.length}</span>
+      </h3>
+
+      {next && (
+        <p className="stats-next">
+          Next up: <strong>{next.name}</strong> — {next.note}
+          {next.progress && next.progress.have > 0 && (
+            <span className="stats-progress">
+              {" "}
+              ({next.progress.have} of {next.progress.need})
+            </span>
+          )}
+        </p>
+      )}
+
+      <ul className="badges">
+        {list.map((a) => (
+          <li key={a.id} className={`badge ${a.earnedAt ? "won" : ""}`} title={a.note}>
+            <span className="badge-name">{a.name}</span>
+            <span className="badge-note">
+              {a.earnedAt ? a.earnedAt.slice(0, 10) : a.note}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <p className="stats-note">Against people only — the computer does not count.</p>
+    </section>
   );
 }
 

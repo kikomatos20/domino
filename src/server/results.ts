@@ -10,6 +10,8 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Room } from "./types";
+import { achievementsFor } from "@/engine/achievements";
+import type { Achievement } from "@/engine/achievements";
 import type { GameState, Seat } from "@/engine/types";
 
 let client: SupabaseClient | null = null;
@@ -132,6 +134,8 @@ export interface RoundTotals {
 }
 
 export interface Stats {
+  /** Earned against people only — see achievements.ts for why. */
+  achievements: Achievement[];
   online: Tally;
   solo: Tally;
   partners: PartnerRecord[];
@@ -180,6 +184,10 @@ function tally(rows: { won: boolean; team_score: number; opponent_score: number 
 
 interface RoundRow {
   won: boolean;
+  mistakes: number;
+  inaccuracies: number;
+  decided: number;
+  role_at_start: string | null;
   capicua: boolean;
   dominoed: boolean;
   closed: boolean;
@@ -247,20 +255,21 @@ export async function statsFor(userId: string): Promise<Stats> {
       partners: [],
       onlineRounds: noRounds,
       soloRounds: noRounds,
+      achievements: achievementsFor([], []),
     };
   }
 
   const [matches, rounds] = await Promise.all([
     db
       .from("match_results")
-      .select("won, team_score, opponent_score, room_code, partner_name, humans")
+      .select("won, team_score, opponent_score, room_code, partner_name, humans, finished_at")
       .eq("user_id", userId)
       .order("finished_at", { ascending: false })
       .limit(500),
     db
       .from("round_stats")
       .select(
-        "won, capicua, dominoed, closed, closed_won, passes, pips_left, accuracy, engine_agreement, team_play, room_code, humans, finished_at"
+        "won, capicua, dominoed, closed, closed_won, passes, pips_left, accuracy, engine_agreement, team_play, mistakes, inaccuracies, decided, role_at_start, room_code, humans, finished_at"
       )
       .eq("user_id", userId)
       .order("finished_at", { ascending: false })
@@ -287,13 +296,40 @@ export async function statsFor(userId: string): Promise<Stats> {
     byPartner.set(name, entry);
   }
 
+  const onlineRoundRows = roundRows.filter(againstPeople);
+
   return {
+    achievements: achievementsFor(
+      onlineMatches.map((m) => ({
+        won: m.won,
+        teamScore: m.team_score,
+        opponentScore: m.opponent_score,
+        partner: m.partner_name ?? null,
+        finishedAt: (m as { finished_at?: string }).finished_at ?? "",
+      })),
+      onlineRoundRows.map((r) => ({
+        won: r.won,
+        capicua: r.capicua,
+        dominoed: r.dominoed,
+        closed: r.closed,
+        closedWon: r.closed_won,
+        roleAtStart: r.role_at_start,
+        pipsLeft: r.pips_left,
+        decided: r.decided,
+        accuracy: r.accuracy,
+        engineAgreement: r.engine_agreement,
+        teamPlay: r.team_play,
+        mistakes: r.mistakes,
+        inaccuracies: r.inaccuracies,
+        finishedAt: r.finished_at,
+      }))
+    ),
     online: tally(onlineMatches),
     solo: tally(soloMatches),
     partners: [...byPartner.entries()]
       .map(([name, v]) => ({ name, ...v }))
       .sort((a, b) => b.played - a.played),
-    onlineRounds: totals(roundRows.filter(againstPeople)),
+    onlineRounds: totals(onlineRoundRows),
     soloRounds: totals(roundRows.filter((r) => !againstPeople(r))),
   };
 }
