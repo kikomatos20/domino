@@ -284,6 +284,43 @@ describe("layoutLine", () => {
     }
   });
 
+  it("never overlaps, wherever the doubles happen to fall", () => {
+    // The fixed chain above puts a double every fourth tile. Real rounds do not
+    // — and a crosswise double sticking out near a corner is exactly where the
+    // one-turn-per-tile rule can run out of room.
+    let seed = 12345;
+    const rand = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 0x100000000;
+    };
+
+    const problems: string[] = [];
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const seat = SEATS[Math.floor(rand() * 4)];
+      const line: PlacedTile[] = [
+        { left: 6, right: 6, seat, opening: true },
+      ];
+      for (let i = 1; i < 28; i++) {
+        const dbl = rand() < 0.25;
+        const v = Math.floor(rand() * 7);
+        line.push({ left: v, right: dbl ? v : (v + 1) % 7, seat: (i % 4) as Seat });
+      }
+
+      for (const size of [MIN_TABLE, 620]) {
+        const rects = layoutLine(line, size).map(rectOf);
+        for (let i = 0; i < rects.length && problems.length < 4; i++) {
+          for (let j = i + 1; j < rects.length; j++) {
+            if (overlaps(rects[i], rects[j])) {
+              problems.push(`attempt ${attempt}, size ${size}: tiles ${i} and ${j} overlap`);
+              break;
+            }
+          }
+        }
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+
   it("joins tiles face to face, never side by side or corner to corner", () => {
     for (const seat of SEATS) {
       for (const size of [MIN_TABLE, 620, 700]) {

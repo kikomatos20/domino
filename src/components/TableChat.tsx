@@ -86,8 +86,10 @@ export default function TableChat({
 
       <div className="chat-log" ref={log}>
         {chat.length === 0 && <p className="chat-empty">Nothing yet.</p>}
-        {chat.map((c) => (
-          <div key={c.id} className={`chat-line ${c.kind}`}>
+        {/* Index in the key as well as the id: a duplicate id from an older
+            room should degrade to a harmless repeat, not a broken list. */}
+        {chat.map((c, i) => (
+          <div key={`${c.id}-${i}`} className={`chat-line ${c.kind}`}>
             {c.kind === "chat" ? (
               <>
                 <span className={`chat-who ${c.seat === you ? "you" : ""}`}>

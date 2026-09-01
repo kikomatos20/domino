@@ -75,14 +75,22 @@ export function nameOf(room: Room, seat: Seat): string {
   return room.players.find((p) => p.seat === seat)?.nickname ?? `Computer (${SEAT_NAME[seat]})`;
 }
 
+/**
+ * Add a line to the table talk.
+ *
+ * The id has to be unique for the whole life of the room, because the browser
+ * keys the rendered list on it. It used to be the timestamp plus the log's
+ * length — which works until the log hits its cap, at which point the length is
+ * always 120 and two entries written in the same millisecond collide. React
+ * then renders one of them repeatedly, which is what filled the chat with the
+ * same move fifteen times over.
+ */
 function say(
   room: Room,
   entry: { kind: ChatEntry["kind"]; seat: Seat | null; who: string; text: string }
 ): void {
-  room.chat = [
-    ...(room.chat ?? []),
-    { ...entry, id: `${Date.now().toString(36)}-${room.chat?.length ?? 0}`, at: Date.now() },
-  ].slice(-CHAT_LIMIT);
+  const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  room.chat = [...(room.chat ?? []), { ...entry, id, at: Date.now() }].slice(-CHAT_LIMIT);
 }
 
 /** "6-3" reads better as "6|3" in a sentence. */

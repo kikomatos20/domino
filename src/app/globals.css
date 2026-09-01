@@ -977,15 +977,36 @@ body {
   animation: capicua-word 500ms 520ms ease-out both;
 }
 
-/* The box you type into on the way down. */
+/* The prompt before a capicúa lands.
+   Dark like the moment it leads into. On the shared light dialog this was
+   white text and a white-ish input on white — invisible. */
+.dialog.taunt {
+  background: linear-gradient(160deg, #12452c, #0b2f1e);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  color: #f4f1e8;
+}
+
+.dialog.taunt h2 {
+  color: var(--gold);
+}
+
+.dialog.taunt .home-sub {
+  color: #f4f1e8;
+  opacity: 0.82;
+}
+
 .dialog.taunt input {
   width: 100%;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 8px;
-  color: #fff;
+  color: #f4f1e8;
   padding: 9px 11px;
   font-size: 16px; /* 16px or iOS zooms the page on focus */
+}
+
+.dialog.taunt input::placeholder {
+  color: rgba(244, 241, 232, 0.45);
 }
 
 .taunt-buttons {
