@@ -112,7 +112,11 @@ function RatingBlock({ rating }: { rating: Rating | null }) {
       <h3>Rating</h3>
       <p className="rating-value">
         <strong>{formatRating(rating.rating)}</strong>
-        {rating.provisional && <span className="rating-flag">provisional</span>}
+        {/* Named either way. "No label" reads as "no information", when in
+            fact a settled rating is the stronger claim of the two. */}
+        <span className={`rating-flag ${rating.provisional ? "" : "verified"}`}>
+          {rating.provisional ? "? provisional" : "✓ verified"}
+        </span>
         {direction !== "flat" && (
           <span className={`rating-move ${direction}`}>
             {moved > 0 ? "+" : "−"}
@@ -122,8 +126,8 @@ function RatingBlock({ rating }: { rating: Rating | null }) {
       </p>
       <p className="stats-note">
         {rating.provisional
-          ? `Still settling — ${rating.matches} of ${PROVISIONAL_UNTIL} matches, and it moves in bigger steps until then.`
-          : `From ${rating.matches} matches against people.`}{" "}
+          ? `Provisional — ${rating.matches} of ${PROVISIONAL_UNTIL} rated matches, and it moves in bigger steps until then.`
+          : `Verified over ${rating.matches} rated matches, and settled enough to move in small steps now.`}{" "}
         Margin counts, so a close loss to a stronger pair can raise it and a
         narrow win as favourites can lower it. It only means something next to
         the people you play with.

@@ -652,6 +652,12 @@ body {
   padding: 2px 8px;
 }
 
+.rating-flag.verified {
+  color: #7fd6a0;
+  border-color: rgba(127, 214, 160, 0.5);
+  background: rgba(127, 214, 160, 0.12);
+}
+
 .rating-move {
   font-size: 0.85rem;
   font-variant-numeric: tabular-nums;
@@ -687,10 +693,22 @@ body {
   padding: 1px 8px;
 }
 
+/*
+ * Verified and provisional should be tellable apart at a glance, across a
+ * table, on a phone — so they differ by colour, by glyph and by the border
+ * being solid or dashed. Any one of the three on its own is too easy to miss.
+ */
+.seat-rating.verified {
+  color: #7fd6a0;
+  background: rgba(127, 214, 160, 0.12);
+  border-color: rgba(127, 214, 160, 0.45);
+}
+
 .seat-rating.provisional {
   color: #9fb8a6;
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.22);
 }
 
 .seat-rating i {

@@ -5,7 +5,7 @@ import type { PlayerView } from "@/server/types";
 import type { Seat } from "@/engine/types";
 import TableChat from "./TableChat";
 import AppMenu from "./AppMenu";
-import { formatRating } from "@/engine/rating";
+import { formatRating, PROVISIONAL_UNTIL } from "@/engine/rating";
 
 const SEAT_LABEL: Record<Seat, string> = {
   0: "South",
@@ -101,15 +101,15 @@ export default function Lobby({
                   and an empty seat both simply say nothing. */}
               {s.rating !== undefined && (
                 <span
-                  className={`seat-rating ${s.provisional ? "provisional" : ""}`}
+                  className={`seat-rating ${s.provisional ? "provisional" : "verified"}`}
                   title={
                     s.provisional
-                      ? "Still settling — fewer than ten matches"
-                      : "Rating, from matches against people"
+                      ? `Provisional — fewer than ${PROVISIONAL_UNTIL} rated matches, so this is still finding its level`
+                      : `Verified — settled over ${PROVISIONAL_UNTIL} or more rated matches`
                   }
                 >
+                  <i aria-hidden>{s.provisional ? "?" : "✓"}</i>
                   {formatRating(s.rating)}
-                  {s.provisional && <i aria-hidden>?</i>}
                 </span>
               )}
               {!s.nickname && view.you && (
@@ -177,8 +177,8 @@ export default function Lobby({
           {view.seats.some((s) => s.rating !== undefined) && (
             <>
               {" "}
-              Ratings count matches against people; a <i>?</i> means fewer than
-              ten, so it is still finding its level.
+              <b>✓</b> is a verified rating, settled over {PROVISIONAL_UNTIL} or
+              more rated matches. <b>?</b> is provisional and still moving.
             </>
           )}
         </p>
