@@ -260,14 +260,21 @@ export function achievementsFor(
       [1, 8, 25, 70]
     ),
 
+    /*
+     * Retuned against real play, not intuition.
+     *
+     * "No mistakes and no inaccuracies" turned out to fire on 73% of recorded
+     * rounds — the review's verdicts are generous, so the absence of a bad one
+     * says almost nothing. Asking for every graded move to be the best one
+     * available lands at about 5%, which is what an achievement should feel
+     * like. Separate from In step, which asks about the engine's ranking
+     * rather than the verdict.
+     */
     tiered(
       "clean",
       "Clean hand",
-      "A round with no mistakes and no inaccuracies, with real decisions in it.",
-      roundDates(
-        rounds,
-        (r) => r.decided >= 3 && r.mistakes === 0 && r.inaccuracies === 0
-      ),
+      "A round of real decisions where every single one was the best move going.",
+      roundDates(rounds, (r) => r.decided >= 3 && r.accuracy === 100),
       [1, 10, 30, 90]
     ),
     tiered(
@@ -349,11 +356,7 @@ export function earnedInRound(
   add("cabeza", "Held the cabeza", (round.keptCabeza ?? 0) > 0);
   add("carried", "Carried it", round.won && round.partnerPassed === true);
   add("wire-to-wire", "Wire to wire", round.won && round.ledThroughout === true);
-  add(
-    "clean",
-    "Clean hand",
-    round.decided >= 3 && round.mistakes === 0 && round.inaccuracies === 0
-  );
+  add("clean", "Clean hand", round.decided >= 3 && round.accuracy === 100);
   add("sharp", "Sharp", (round.accuracy ?? 0) >= 90 && round.decided >= 3);
   add("in-step", "In step", round.decided >= 3 && round.engineAgreement === 100);
   add(

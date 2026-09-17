@@ -60,17 +60,27 @@ describe("achievements", () => {
 
   it("will not hand out a clean hand for a round with nothing to decide", () => {
     // Every move forced is not a clean round, it is an empty one.
-    const forced = achievementsFor(
-      [],
-      [round({ decided: 0, mistakes: 0, inaccuracies: 0 })]
-    );
+    const forced = achievementsFor([], [round({ decided: 0, accuracy: 100 })]);
     expect(find(forced, "clean").earnedAt).toBeNull();
 
-    const real = achievementsFor(
-      [],
-      [round({ decided: 4, mistakes: 0, inaccuracies: 0 })]
-    );
+    const real = achievementsFor([], [round({ decided: 4, accuracy: 100 })]);
     expect(find(real, "clean").earnedAt).not.toBeNull();
+  });
+
+  /**
+   * Measured against 161 recorded rounds: "no mistakes and no inaccuracies"
+   * fired on 73% of them, because the review rarely calls anything a mistake.
+   * An achievement four rounds in five earn is not one.
+   */
+  it("wants every decision to be the best one, not merely not-bad", () => {
+    const decent = achievementsFor(
+      [],
+      [round({ decided: 5, accuracy: 85, mistakes: 0, inaccuracies: 0 })]
+    );
+    expect(find(decent, "clean").earnedAt).toBeNull();
+
+    const perfect = achievementsFor([], [round({ decided: 5, accuracy: 100 })]);
+    expect(find(perfect, "clean").earnedAt).not.toBeNull();
   });
 
   it("counts three wins in a row only when they are consecutive", () => {
