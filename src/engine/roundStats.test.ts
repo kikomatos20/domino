@@ -73,6 +73,21 @@ describe("what gets written down about a round", () => {
     }
   });
 
+  it("only reports a team percentage when there were team calls to make", () => {
+    for (let seed = 1; seed <= 10; seed++) {
+      const state = playRound(seed * 32452843);
+      for (const seat of [0, 1, 2, 3] as Seat[]) {
+        const stat = statsFor(state, seat)!;
+        // The two have to agree: a percentage out of nothing is not a
+        // percentage, and a count with no percentage hides the denominator.
+        expect(stat.teamPlay === null).toBe(stat.teamCalls === 0);
+        expect(stat.keptCabeza).toBeGreaterThanOrEqual(0);
+        // You cannot have led throughout without playing a tile.
+        if (stat.ledThroughout) expect(stat.moves).toBeGreaterThan(0);
+      }
+    }
+  });
+
   it("leaves accuracy unset when there was nothing to decide", () => {
     // A player with no graded decisions gets null rather than a flattering 100.
     const state = playRound(42);

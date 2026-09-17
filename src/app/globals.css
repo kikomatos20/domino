@@ -862,6 +862,68 @@ body {
   color: var(--gold);
 }
 
+/*
+ * Rungs.
+ *
+ * One custom property per badge drives the name, the border, the wash and the
+ * pips, so a rung is a single change rather than four. Platinum gets a glow as
+ * well as a colour — it is several times further than gold, and should not
+ * look like one more shade of the same idea.
+ */
+.badge.rung-bronze {
+  --rung: #cd7f32;
+}
+.badge.rung-silver {
+  --rung: #cfd6dd;
+}
+.badge.rung-gold {
+  --rung: var(--gold);
+}
+.badge.rung-platinum {
+  --rung: #7fe7e0;
+}
+
+.badge.won.rung-bronze,
+.badge.won.rung-silver,
+.badge.won.rung-gold,
+.badge.won.rung-platinum {
+  background: linear-gradient(150deg, color-mix(in srgb, var(--rung) 22%, transparent), rgba(0, 0, 0, 0.2));
+  border-color: color-mix(in srgb, var(--rung) 55%, transparent);
+}
+
+.badge.won.rung-bronze .badge-name,
+.badge.won.rung-silver .badge-name,
+.badge.won.rung-gold .badge-name,
+.badge.won.rung-platinum .badge-name {
+  color: var(--rung);
+}
+
+.badge.won.rung-platinum {
+  border-color: var(--rung);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--rung) 30%, transparent) inset,
+    0 0 14px color-mix(in srgb, var(--rung) 25%, transparent);
+}
+
+.badge-rungs {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.badge-rungs i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.badge-rungs i.on {
+  background: var(--rung, var(--gold));
+  border-color: var(--rung, var(--gold));
+}
+
 .badge-note {
   display: block;
   margin-top: 2px;

@@ -167,6 +167,110 @@ describe("achievements", () => {
     expect(live).toEqual(history);
   });
 
+  it("climbs bronze, silver, gold, platinum as you do it again", () => {
+    const capicuas = (n: number) =>
+      achievementsFor(
+        [],
+        Array.from({ length: n }, (_, i) =>
+          // Spread over months so the dates stay real and sortable.
+          round({ capicua: true, finishedAt: `2026-${String(1 + (i % 12)).padStart(2, "0")}-${String(1 + (i % 28)).padStart(2, "0")}T00:00:00Z` })
+        )
+      );
+
+    const once = find(capicuas(1), "capicua");
+    expect(once.tier).toMatchObject({ level: 1, levels: 4, key: "bronze", top: false });
+    expect(once.progress).toEqual({ have: 1, need: 5 });
+
+    expect(find(capicuas(5), "capicua").tier).toMatchObject({ level: 2, key: "silver" });
+    expect(find(capicuas(15), "capicua").tier).toMatchObject({ level: 3, key: "gold" });
+
+    const platinum = find(capicuas(40), "capicua").tier!;
+    expect(platinum).toMatchObject({ level: 4, key: "platinum", top: true });
+
+    // At the top, progress sits full rather than pointing at a rung that is
+    // not there — but the count keeps rising.
+    const beyond = find(capicuas(45), "capicua");
+    expect(beyond.progress).toEqual({ have: 40, need: 40 });
+    expect(beyond.tier!.times).toBe(45);
+  });
+
+  it("gives every tiered achievement the same four rungs", () => {
+    const tiered = achievementsFor([], []).filter((a) => a.tier);
+    expect(tiered.length).toBeGreaterThan(8);
+    for (const a of tiered) {
+      expect(a.tier!.levels).toBe(4);
+      // Nothing is standing on a rung before it has happened once.
+      expect(a.tier!.key).toBe("none");
+      expect(a.tier!.top).toBe(false);
+    }
+  });
+
+  it("puts platinum well beyond gold, so it cannot be had in a week", () => {
+    // Gold on capicúas is 15; platinum is 40, so 39 is not enough.
+    const nearly = achievementsFor(
+      [],
+      Array.from({ length: 39 }, (_, i) =>
+        round({ capicua: true, finishedAt: `2026-0${1 + (i % 9)}-0${1 + (i % 9)}T00:00:00Z` })
+      )
+    );
+    expect(find(nearly, "capicua").tier!.key).toBe("gold");
+  });
+
+  it("still dates a tiered one to the first time, however many follow", () => {
+    const list = achievementsFor(
+      [],
+      [
+        round({ capicua: true, finishedAt: "2026-08-20T10:00:00Z" }),
+        round({ capicua: true, finishedAt: "2026-08-01T10:00:00Z" }),
+        round({ capicua: true, finishedAt: "2026-08-27T10:00:00Z" }),
+      ]
+    );
+    expect(find(list, "capicua").earnedAt).toBe("2026-08-01T10:00:00Z");
+  });
+
+  it("wants real team decisions before calling it team play", () => {
+    // A perfect score out of one decision is not a round of team play.
+    const thin = achievementsFor([], [round({ teamPlay: 100, teamCalls: 1 })]);
+    expect(find(thin, "fourteen-tiles").earnedAt).toBeNull();
+
+    const real = achievementsFor([], [round({ teamPlay: 100, teamCalls: 4 })]);
+    expect(find(real, "fourteen-tiles").earnedAt).not.toBeNull();
+  });
+
+  it("no longer rewards losing", () => {
+    const list = achievementsFor([], [round({ won: false, pipsLeft: 2 })]);
+    expect(list.find((a) => a.id === "light")).toBeUndefined();
+  });
+
+  it("recognises the cabeza, carrying the round, and leading it throughout", () => {
+    const held = achievementsFor([], [round({ keptCabeza: 2 })]);
+    expect(find(held, "cabeza").earnedAt).not.toBeNull();
+
+    const carried = achievementsFor([], [round({ won: true, partnerPassed: true })]);
+    expect(find(carried, "carried").earnedAt).not.toBeNull();
+
+    // Losing it does not count, however the round was played.
+    const lost = achievementsFor([], [round({ won: false, partnerPassed: true })]);
+    expect(find(lost, "carried").earnedAt).toBeNull();
+
+    const led = achievementsFor([], [round({ won: true, ledThroughout: true })]);
+    expect(find(led, "wire-to-wire").earnedAt).not.toBeNull();
+  });
+
+  /**
+   * Rounds recorded before these signals existed have no opinion about them.
+   * A missing value must read as "not established" rather than as a zero that
+   * quietly hands out — or withholds — an achievement.
+   */
+  it("gives an older round nothing it cannot vouch for", () => {
+    const old = round({ won: true, teamPlay: 100 });
+    const list = achievementsFor([], [old]);
+    for (const id of ["cabeza", "carried", "wire-to-wire", "fourteen-tiles"]) {
+      expect(find(list, id).earnedAt).toBeNull();
+    }
+    expect(earnedInRound(old, new Set()).map((a) => a.id)).not.toContain("cabeza");
+  });
+
   it("has nothing to suggest once everything is earned", () => {
     const done = achievementsFor([], []).map((a) => ({ ...a, earnedAt: "2026-08-27" }));
     expect(nextUp(done)).toBeNull();

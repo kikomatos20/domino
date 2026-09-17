@@ -56,6 +56,10 @@ function row(
     accuracy: stat.accuracy,
     engine_agreement: stat.engineAgreement,
     team_play: stat.teamPlay,
+    team_calls: stat.teamCalls,
+    kept_cabeza: stat.keptCabeza,
+    led_throughout: stat.ledThroughout,
+    partner_passed: stat.partnerPassed,
     mistakes: stat.mistakes,
     inaccuracies: stat.inaccuracies,
   };

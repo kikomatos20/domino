@@ -46,6 +46,14 @@ export interface RoundStat {
   accuracy: number | null;
   engineAgreement: number | null;
   teamPlay: number | null;
+  /** How many team judgements there were, so a ratio can be read honestly. */
+  teamCalls: number;
+  /** Times you held the cabeza back while the round was yours to finish. */
+  keptCabeza: number;
+  /** You held the lead at every tile you played. */
+  ledThroughout: boolean;
+  /** Your partner passed, putting the round on you. */
+  partnerPassed: boolean;
   mistakes: number;
   inaccuracies: number;
 }
@@ -88,6 +96,10 @@ export function statsFor(game: RoundSource, seat: Seat): RoundStat | null {
       ? Math.round((review.engineAgreement / decided.length) * 100)
       : null,
     teamPlay: review.teamPlay,
+    teamCalls: review.teamCalls,
+    keptCabeza: review.keptCabeza,
+    ledThroughout: review.ledThroughout,
+    partnerPassed: review.partnerPassed,
     mistakes: plays.filter((m) => m.verdict === "mistake").length,
     inaccuracies: plays.filter((m) => m.verdict === "inaccuracy").length,
   };

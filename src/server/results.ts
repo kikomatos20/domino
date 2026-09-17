@@ -210,6 +210,11 @@ interface RoundRow {
   accuracy: number | null;
   engine_agreement: number | null;
   team_play: number | null;
+  /** Null on rounds recorded before these were kept. */
+  team_calls: number | null;
+  kept_cabeza: number | null;
+  led_throughout: boolean | null;
+  partner_passed: boolean | null;
   finished_at: string;
 }
 
@@ -282,7 +287,7 @@ export async function statsFor(userId: string): Promise<Stats> {
     db
       .from("round_stats")
       .select(
-        "won, capicua, dominoed, closed, closed_won, passes, pips_left, accuracy, engine_agreement, team_play, mistakes, inaccuracies, decided, role_at_start, room_code, humans, finished_at"
+        "won, capicua, dominoed, closed, closed_won, passes, pips_left, accuracy, engine_agreement, team_play, team_calls, kept_cabeza, led_throughout, partner_passed, mistakes, inaccuracies, decided, role_at_start, room_code, humans, finished_at"
       )
       .eq("user_id", userId)
       .order("finished_at", { ascending: false })
@@ -332,6 +337,10 @@ export async function statsFor(userId: string): Promise<Stats> {
         accuracy: r.accuracy,
         engineAgreement: r.engine_agreement,
         teamPlay: r.team_play,
+        teamCalls: r.team_calls ?? undefined,
+        keptCabeza: r.kept_cabeza ?? undefined,
+        ledThroughout: r.led_throughout ?? undefined,
+        partnerPassed: r.partner_passed ?? undefined,
         mistakes: r.mistakes,
         inaccuracies: r.inaccuracies,
         finishedAt: r.finished_at,

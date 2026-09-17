@@ -97,6 +97,22 @@ export interface RoundReview {
   accuracy: number;
   /** Share of team-related judgements that went your side's way, 0-100. */
   teamPlay: number | null;
+  /**
+   * How many team judgements there actually were.
+   *
+   * A percentage alone cannot tell a round where you faced one team decision
+   * and got it right from one where you faced eight. Anything that rewards
+   * team play needs the denominator, not the ratio.
+   */
+  teamCalls: number;
+  /** Moves where you held your cabeza back while the round was yours to finish. */
+  keptCabeza: number;
+  /** Moves where you spent it instead. */
+  spentCabeza: number;
+  /** You were the mano at every tile you played — the lead never left you. */
+  ledThroughout: boolean;
+  /** Your partner passed at some point, which puts the round on you. */
+  partnerPassed: boolean;
   summary: string;
 }
 
@@ -272,6 +288,12 @@ export function reviewRound(history: MoveRecord[], seat: Seat): RoundReview {
   let teamGood = 0;
   let teamBad = 0;
   let sawRoleShift = false;
+  // Signals the achievements are built from. Counted here rather than inferred
+  // from percentages later, so "a team decision" means a decision that was
+  // actually put to you.
+  let keptCabeza = 0;
+  let spentCabeza = 0;
+  let movesAsMano = 0;
 
   for (const rec of history) {
     if (rec.seat !== seat) continue;
@@ -297,6 +319,7 @@ export function reviewRound(history: MoveRecord[], seat: Seat): RoundReview {
     // Who leads at this moment, and therefore what your job is right now.
     const mano = manoAt(rec.before.hands, opener);
     const roleNow = roleOf(seat, mano);
+    if (roleNow === "mano") movesAsMano++;
 
     const principles: Note[] = [];
     let credit = 0;
@@ -428,6 +451,7 @@ export function reviewRound(history: MoveRecord[], seat: Seat): RoundReview {
 
         if (heldTheLastOf(endBefore) && !wentOut && !closesRound) {
           if (roundIsYoursToFinish) {
+            spentCabeza++;
             solo(
               {
                 kind: "minus",
@@ -446,6 +470,7 @@ export function reviewRound(history: MoveRecord[], seat: Seat): RoundReview {
             });
           }
         } else if (keptACabeza && roundIsYoursToFinish) {
+          keptCabeza++;
           solo(
             {
               kind: "plus",
@@ -734,6 +759,15 @@ export function reviewRound(history: MoveRecord[], seat: Seat): RoundReview {
     engineAgreement,
     accuracy,
     teamPlay,
+    teamCalls: teamTotal,
+    keptCabeza,
+    spentCabeza,
+    // The lead was yours at every tile you played — you opened and never gave
+    // it up. Distinct from the role you started in, which a single pass changes.
+    ledThroughout: number > 0 && movesAsMano === number,
+    partnerPassed: history.some(
+      (r) => r.seat === ((seat + 2) % 4) && r.kind === "pass"
+    ),
     summary: summarize(moves, decided.length, engineAgreement, accuracy, passes, teamPlay, role),
   };
 }
