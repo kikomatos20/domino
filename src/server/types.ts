@@ -88,6 +88,15 @@ export interface Room {
    * groups keep, which is why the host decides it per match.
    */
   maxDoubles?: number | null;
+  /**
+   * Whether this match counts toward everyone's rating.
+   *
+   * Only meaningful with four accounts at the table. What a result is worth
+   * depends on who you played with and who you played against, and a guest has
+   * no rating to reckon with — so a table with one is a friendly, whatever the
+   * host would prefer. Set false at the deal when the seats do not qualify.
+   */
+  rated?: boolean;
   hostToken: string;
   players: Player[];
   /** People watching without a seat. */
@@ -157,6 +166,10 @@ export interface PlayerView {
   difficulty: Difficulty;
   target: number;
   maxDoubles?: number | null;
+  /** The host wants this to count. */
+  rated?: boolean;
+  /** Whether it actually can — every seat an account. */
+  canBeRated?: boolean;
   seats: {
     seat: Seat;
     nickname: string | null;
@@ -172,6 +185,17 @@ export interface PlayerView {
     tilesLeft: number;
     /** Ready for the next round. Meaningless while a round is in progress. */
     ready: boolean;
+    /**
+     * Someone signed in is sitting here. Not who — just that the seat can
+     * carry a result, which is what makes a match ratable.
+     */
+    account: boolean;
+    /**
+     * Their rating, when they are signed in and have played. Filled in for the
+     * lobby only — see `withRatings` — so it is absent during a match.
+     */
+    rating?: number;
+    provisional?: boolean;
   }[];
   /** Outstanding seat swap requests, from one seat to another. Lobby only. */
   swaps: { from: Seat; to: Seat }[];

@@ -9,7 +9,7 @@
  */
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Room } from "./types";
+import type { PlayerView, Room } from "./types";
 import { achievementsFor } from "@/engine/achievements";
 import type { Achievement } from "@/engine/achievements";
 import { ratingsFrom } from "@/engine/rating";
@@ -75,6 +75,10 @@ export async function recordMatch(room: Room, game: GameState): Promise<void> {
         // Who actually sat down. A room full of computers is a solo game with
         // a room code, and must not count as a win against people.
         humans: room.players.length,
+        // Settled at the deal, in startMatch. Read rather than recomputed:
+        // somebody may have dropped since, and a match that started rated
+        // stays rated.
+        rated: room.rated !== false,
       };
     });
 
@@ -299,6 +303,9 @@ async function poolRatings(): Promise<Map<string, Rating>> {
   const { data } = await db
     .from("match_results")
     .select("match_id, user_id, won, team_score, opponent_score, humans, room_code, finished_at")
+    // Rated matches only: four accounts at the table, agreed beforehand.
+    // Everything else is a friendly and moves nobody's number.
+    .eq("rated", true)
     .order("finished_at", { ascending: true })
     .limit(4000);
 
@@ -334,6 +341,62 @@ async function poolRatings(): Promise<Map<string, Rating>> {
   }
 
   return ratingsFrom(matches);
+}
+
+/**
+ * Pool ratings, held briefly.
+ *
+ * Every player in a lobby polls, and the rating of a table full of people does
+ * not change while they are sitting in it — so re-reading the whole pool for
+ * each of those polls would be four identical queries every few seconds. A
+ * short window is plenty: a rating only moves when a match finishes, and
+ * anyone who has just finished one is looking at the scoreboard, not the
+ * lobby.
+ */
+let cached: { at: number; ratings: Map<string, Rating> } | null = null;
+const RATING_TTL = 30_000;
+
+async function cachedPoolRatings(): Promise<Map<string, Rating>> {
+  if (cached && Date.now() - cached.at < RATING_TTL) return cached.ratings;
+  const ratings = await poolRatings();
+  cached = { at: Date.now(), ratings };
+  return ratings;
+}
+
+/**
+ * Put each seat's rating into a view, for the lobby.
+ *
+ * Deliberately not part of `viewFor`, which is pure and knows nothing about
+ * the database — and deliberately lobby-only, because this costs a query and
+ * nobody needs their partner's rating refreshed while a tile is in the air.
+ *
+ * Account ids stay on this side of the line. What goes out is a number.
+ */
+export async function withRatings(
+  view: PlayerView,
+  room: Room
+): Promise<PlayerView> {
+  if (room.status !== "lobby") return view;
+
+  let ratings: Map<string, Rating>;
+  try {
+    ratings = await cachedPoolRatings();
+  } catch {
+    // A rating is a nicety. Never hold up a lobby for one.
+    return view;
+  }
+  if (ratings.size === 0) return view;
+
+  return {
+    ...view,
+    seats: view.seats.map((seat) => {
+      const player = room.players.find((p) => p.seat === seat.seat);
+      const found = player?.userId ? ratings.get(player.userId) : undefined;
+      return found
+        ? { ...seat, rating: found.rating, provisional: found.provisional }
+        : seat;
+    }),
+  };
 }
 
 export async function statsFor(userId: string): Promise<Stats> {

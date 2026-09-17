@@ -23,6 +23,7 @@ export function createMemoryStore(): RoomStore & { clear(): void } {
           chat: room.chat ?? [],
           banned: room.banned ?? [],
           watchers: room.watchers ?? [],
+          rated: room.rated !== false,
           players: room.players.map((p) => ({ ...p, wantsSeat: p.wantsSeat ?? null })),
         })
       );

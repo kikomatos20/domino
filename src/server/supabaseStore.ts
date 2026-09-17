@@ -42,6 +42,7 @@ interface RoomRow {
   chat: ChatEntry[] | null;
   banned: string[] | null;
   watchers: Watcher[] | null;
+  rated: boolean | null;
   updated_at: string;
 }
 
@@ -127,6 +128,7 @@ export function createSupabaseStore(): RoomStore & {
         difficulty: room.difficulty,
         target: room.target,
         maxDoubles: room.max_doubles ?? null,
+        rated: room.rated ?? true,
         hostToken: room.host_token,
         players: (players ?? []).map((p) => ({
           seat: p.seat as Seat,
@@ -159,6 +161,7 @@ export function createSupabaseStore(): RoomStore & {
           difficulty: room.difficulty,
           target: room.target,
           max_doubles: room.maxDoubles ?? null,
+          rated: room.rated !== false,
           host_token: room.hostToken,
         })
         .select("id")
@@ -214,6 +217,7 @@ export function createSupabaseStore(): RoomStore & {
         p_clear_state: !room.game,
         p_banned: room.banned ?? [],
         p_watchers: room.watchers ?? [],
+        p_rated: room.rated !== false,
       });
       if (error) throw error;
     },

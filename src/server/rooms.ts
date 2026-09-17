@@ -157,6 +157,21 @@ function freeSeats(room: Room): Seat[] {
   return SEATS.filter((s) => !isHuman(room, s));
 }
 
+/**
+ * Can this table's result count for anything?
+ *
+ * Only with four signed-in accounts. A rating says how you did against the
+ * people you played — take one of them away and replace them with a guest or
+ * a computer, and the expectation the result is measured against is a guess
+ * about a stranger. Better to record nothing than to record noise.
+ */
+export function canBeRated(room: Room): boolean {
+  return SEATS.every((seat) => {
+    const player = room.players.find((p) => p.seat === seat);
+    return Boolean(player?.userId);
+  });
+}
+
 // ---------------------------------------------------------------- lobby
 
 export interface CreateOptions {
@@ -165,6 +180,7 @@ export interface CreateOptions {
   difficulty?: Difficulty;
   target?: number;
   maxDoubles?: number | null;
+  rated?: boolean;
   random?: () => number;
   /** The account opening the table, if they were signed in. */
   userId?: string | null;
@@ -190,6 +206,9 @@ export async function createRoom(
     difficulty: opts.difficulty ?? "medium",
     target: opts.target ?? 100,
     maxDoubles: opts.maxDoubles ?? null,
+    // On by default: four people who all signed in almost certainly want it to
+    // count, and the host can say otherwise before the deal.
+    rated: opts.rated ?? true,
     hostToken: token,
     players: [
       {
@@ -608,6 +627,7 @@ export async function updateSettings(
     difficulty?: Difficulty;
     target?: number;
     maxDoubles?: number | null;
+    rated?: boolean;
   }
 ): Promise<Room> {
   const room = await mustGet(store, code);
@@ -620,6 +640,17 @@ export async function updateSettings(
   if (settings.fillWithAi !== undefined) room.fillWithAi = settings.fillWithAi;
   if (settings.difficulty) room.difficulty = settings.difficulty;
   if (settings.target) room.target = settings.target;
+  if (settings.rated !== undefined && settings.rated !== (room.rated !== false)) {
+    room.rated = settings.rated;
+    say(room, {
+      kind: "event",
+      seat: null,
+      who: "",
+      text: settings.rated
+        ? "Rated match — this one counts"
+        : "Friendly — this one will not count toward ratings",
+    });
+  }
   if (settings.maxDoubles !== undefined) {
     const next = settings.maxDoubles === null ? null : Math.max(MIN_DOUBLE_LIMIT, settings.maxDoubles);
     if (next !== (room.maxDoubles ?? null)) {
@@ -719,6 +750,24 @@ export async function startMatch(
 
   if (!room.fillWithAi && room.players.length < 4) {
     throw new RoomError("Waiting for four players — or switch on computer players", 409);
+  }
+
+  /*
+   * Settle whether this counts, once, at the deal.
+   *
+   * Frozen here rather than worked out when the result is written: somebody
+   * can drop out mid-match and be covered by the computer, and a match that
+   * started rated should stay rated. It also means nobody can change the
+   * terms after seeing how it is going.
+   */
+  if (room.rated !== false && !canBeRated(room)) {
+    room.rated = false;
+    say(room, {
+      kind: "event",
+      seat: null,
+      who: "",
+      text: "Friendly match — everyone needs an account for it to count toward ratings",
+    });
   }
 
   room.status = "playing";
@@ -998,6 +1047,9 @@ export function viewFor(room: Room, token: string | null): PlayerView {
       isYou: !!me && me.seat === seat,
       tilesLeft: game ? game.hands[seat].length : 0,
       ready: player?.ready ?? false,
+      // Whether there is an account behind this seat, not which one. The table
+      // needs to know a seat can be rated; nobody needs the id.
+      account: Boolean(player?.userId),
     };
   });
 
@@ -1025,6 +1077,8 @@ export function viewFor(room: Room, token: string | null): PlayerView {
     difficulty: room.difficulty,
     target: room.target,
     maxDoubles: room.maxDoubles ?? null,
+    rated: room.rated !== false,
+    canBeRated: canBeRated(room),
     seats,
     swaps,
     chat: room.chat ?? [],

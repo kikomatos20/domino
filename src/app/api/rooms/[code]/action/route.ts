@@ -68,6 +68,7 @@ export async function POST(
               : body.maxDoubles === null
                 ? null
                 : Number(body.maxDoubles),
+          rated: body.rated === undefined ? undefined : body.rated === true,
         });
         return NextResponse.json({ view: viewFor(room, token) });
       }

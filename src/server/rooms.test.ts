@@ -267,6 +267,84 @@ describe("lobby", () => {
     expect(room.game!.maxDoubles).toBe(4);
   });
 
+  it("will not call a match rated unless every seat is an account", async () => {
+    const { code, tokens } = await fourPlayers();
+    // Four people, but playing as guests.
+    expect(viewFor(await get(code), tokens[0]).canBeRated).toBe(false);
+
+    await startMatch(store, code, tokens[0]);
+    const room = await get(code);
+    expect(room.rated).toBe(false);
+    expect(room.chat.some((c) => /Friendly match/i.test(c.text))).toBe(true);
+  });
+
+  it("rates a table where all four signed in", async () => {
+    const { room, token } = await createRoom(store, {
+      nickname: "Kiko",
+      userId: "u-kiko",
+    });
+    for (const [name, id] of [
+      ["Ana", "u-ana"],
+      ["Beto", "u-beto"],
+      ["Caro", "u-caro"],
+    ]) {
+      await joinRoom(store, room.code, name, undefined, id);
+    }
+
+    const view = viewFor(await get(room.code), token);
+    expect(view.canBeRated).toBe(true);
+    expect(view.rated).toBe(true);
+    expect(view.seats.every((s) => s.account)).toBe(true);
+
+    await startMatch(store, room.code, token);
+    expect((await get(room.code)).rated).toBe(true);
+  });
+
+  it("lets the host call it a friendly even when it could count", async () => {
+    const { room, token } = await createRoom(store, {
+      nickname: "Kiko",
+      userId: "u-kiko",
+    });
+    for (const [name, id] of [
+      ["Ana", "u-ana"],
+      ["Beto", "u-beto"],
+      ["Caro", "u-caro"],
+    ]) {
+      await joinRoom(store, room.code, name, undefined, id);
+    }
+
+    const off = await updateSettings(store, room.code, token, { rated: false });
+    expect(off.rated).toBe(false);
+    expect(off.chat.some((c) => /will not count/i.test(c.text))).toBe(true);
+
+    await startMatch(store, room.code, token);
+    // Still a friendly after the deal — and nobody can change it now.
+    expect((await get(room.code)).rated).toBe(false);
+    await expect(
+      updateSettings(store, room.code, token, { rated: true })
+    ).rejects.toThrow(/before the match starts/i);
+  });
+
+  it("keeps a match rated even if somebody drops mid-game", async () => {
+    const { room, token } = await createRoom(store, {
+      nickname: "Kiko",
+      userId: "u-kiko",
+    });
+    const others = [];
+    for (const [name, id] of [
+      ["Ana", "u-ana"],
+      ["Beto", "u-beto"],
+      ["Caro", "u-caro"],
+    ]) {
+      others.push(await joinRoom(store, room.code, name, undefined, id));
+    }
+    await startMatch(store, room.code, token);
+    await leaveRoom(store, room.code, others[0].token);
+
+    // The terms were settled at the deal. Walking out does not unmake them.
+    expect((await get(room.code)).rated).toBe(true);
+  });
+
   it("is case-insensitive about codes", async () => {
     const { room } = await createRoom(store, { nickname: "Kiko" });
     await expect(joinRoom(store, room.code.toLowerCase(), "Ana")).resolves.toBeTruthy();

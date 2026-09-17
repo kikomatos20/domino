@@ -5,6 +5,7 @@ import type { PlayerView } from "@/server/types";
 import type { Seat } from "@/engine/types";
 import TableChat from "./TableChat";
 import AppMenu from "./AppMenu";
+import { formatRating } from "@/engine/rating";
 
 const SEAT_LABEL: Record<Seat, string> = {
   0: "South",
@@ -39,6 +40,7 @@ export default function Lobby({
     fillWithAi?: boolean;
     difficulty?: string;
     maxDoubles?: number | null;
+    rated?: boolean;
   }) => void;
   onStart: () => void;
   onChat: (text: string) => void;
@@ -48,6 +50,9 @@ export default function Lobby({
   const [chatOpen, setChatOpen] = useState(true);
   const isHost = view.you?.isHost ?? false;
   const humans = view.seats.filter((s) => s.nickname).length;
+  // Seats with an account behind them. Not the same as seats with a rating:
+  // somebody signed in who has never played has one and not the other.
+  const signedIn = view.seats.filter((s) => s.account).length;
 
   // Someone waiting on you, and the seat you are waiting on.
   const incoming = view.swaps.find((s) => s.to === view.you?.seat) ?? null;
@@ -91,6 +96,22 @@ export default function Lobby({
                 {s.nickname ?? (view.fillWithAi ? s.label : "Waiting…")}
                 {s.isYou && " (you)"}
               </span>
+
+              {/* Only a signed-in player who has played has one. A guest seat
+                  and an empty seat both simply say nothing. */}
+              {s.rating !== undefined && (
+                <span
+                  className={`seat-rating ${s.provisional ? "provisional" : ""}`}
+                  title={
+                    s.provisional
+                      ? "Still settling — fewer than ten matches"
+                      : "Rating, from matches against people"
+                  }
+                >
+                  {formatRating(s.rating)}
+                  {s.provisional && <i aria-hidden>?</i>}
+                </span>
+              )}
               {!s.nickname && view.you && (
                 <button className="seat-take" disabled={busy} onClick={() => onSeat(s.seat)}>
                   Sit here
@@ -153,6 +174,13 @@ export default function Lobby({
 
         <p className="home-note">
           Partners sit across from each other: South with North, East with West.
+          {view.seats.some((s) => s.rating !== undefined) && (
+            <>
+              {" "}
+              Ratings count matches against people; a <i>?</i> means fewer than
+              ten, so it is still finding its level.
+            </>
+          )}
         </p>
 
         {isHost ? (
@@ -180,6 +208,31 @@ export default function Lobby({
                 </select>
               </label>
             )}
+
+            {/*
+              Rated or friendly.
+
+              Disabled rather than hidden when the table cannot support it: the
+              host should be able to see that the option exists and what is
+              standing in its way, rather than wondering where it went.
+            */}
+            <label className={`check ${view.canBeRated ? "" : "off"}`}>
+              <input
+                type="checkbox"
+                checked={Boolean(view.rated && view.canBeRated)}
+                disabled={busy || !view.canBeRated}
+                onChange={(e) => onSettings({ rated: e.target.checked })}
+              />
+              <span>
+                Rated match
+                {!view.canBeRated && (
+                  <em className="check-why">
+                    {" "}
+                    — needs all four seats signed in ({signedIn} of 4)
+                  </em>
+                )}
+              </span>
+            </label>
 
             {/*
               A house rule, not a rule of dominoes — off unless this table

@@ -661,6 +661,50 @@ body {
 }
 
 /*
+ * A seat's rating in the lobby.
+ *
+ * Quiet by design: it sits under the name as a fact about them, not as a
+ * ranking of the table. Provisional is dimmer still and carries a "?", because
+ * a number nobody should lean on yet ought to look like one.
+ */
+.seat-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  align-self: flex-start;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--gold);
+  background: rgba(212, 175, 55, 0.12);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.seat-rating.provisional {
+  color: #9fb8a6;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.seat-rating i {
+  font-style: normal;
+  opacity: 0.75;
+}
+
+/* An option the table cannot use yet — visible, and saying why. */
+.check.off {
+  opacity: 0.6;
+}
+
+.check-why {
+  font-style: normal;
+  font-size: 0.78rem;
+  color: #9fb8a6;
+}
+
+/*
  * The badges, opened over a table.
  *
  * Capped and scrollable: the list is fifteen long and a phone in landscape has
