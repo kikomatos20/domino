@@ -6,6 +6,8 @@ import {
   handPips,
   legalMoves,
   matchWinner,
+  MIN_DOUBLE_LIMIT,
+  mostDoubles,
   mustPass,
   newMatch,
   nextRound,
@@ -53,6 +55,61 @@ describe("setup", () => {
     expect(s.hands[s.opener]).toContain("6-6");
     const moves = legalMoves(s, s.opener);
     expect(moves).toEqual([{ tileId: "6-6", end: "right" }]);
+  });
+});
+
+describe("the five-doubles house rule", () => {
+  it("counts the fullest hand, not the total", () => {
+    expect(mostDoubles([["0-0", "1-1"], ["2-2"], [], ["3-3", "4-4", "5-5"]])).toBe(3);
+    expect(mostDoubles([["0-1"], ["1-2"], ["2-3"], ["3-4"]])).toBe(0);
+  });
+
+  it("deals nobody more than the limit when the rule is on", () => {
+    const rng = seededRng(101);
+    for (let i = 0; i < 200; i++) {
+      expect(mostDoubles(newMatch(rng, 100, 4).hands)).toBeLessThanOrEqual(4);
+    }
+  });
+
+  it("keeps the rule for every round of the match, not just the first", () => {
+    const rng = seededRng(202);
+    // A target nobody can reach, so the match runs long enough to redeal.
+    let s = newMatch(rng, 10_000, 3);
+    for (let i = 0; i < 10; i++) {
+      expect(mostDoubles(s.hands)).toBeLessThanOrEqual(3);
+      s = nextRound(playRound(s), rng);
+    }
+  });
+
+  it("still deals whole, distinct hands under the rule", () => {
+    const s = newMatch(seededRng(303), 100, 4);
+    expect(s.hands.every((h) => h.length === 7)).toBe(true);
+    expect(new Set(s.hands.flat()).size).toBe(28);
+  });
+
+  /**
+   * Seven doubles across four hands means somebody always holds at least two,
+   * so a limit below two asks for a deal that cannot exist. It must still
+   * deal — a bad setting is not a reason to hand back a broken table.
+   */
+  it("survives a limit the deck cannot satisfy", () => {
+    expect(MIN_DOUBLE_LIMIT).toBe(2);
+    const rng = seededRng(404);
+    for (let i = 0; i < 50; i++) {
+      const s = newMatch(rng, 100, 0);
+      expect(s.hands.every((h) => h.length === 7)).toBe(true);
+      expect(new Set(s.hands.flat()).size).toBe(28);
+      expect(mostDoubles(s.hands)).toBeGreaterThanOrEqual(MIN_DOUBLE_LIMIT);
+    }
+  });
+
+  it("leaves the deal alone when the rule is off", () => {
+    const rng = seededRng(505);
+    let seenFive = false;
+    for (let i = 0; i < 2000 && !seenFive; i++) {
+      if (mostDoubles(newMatch(rng).hands) >= 5) seenFive = true;
+    }
+    expect(seenFive).toBe(true);
   });
 });
 

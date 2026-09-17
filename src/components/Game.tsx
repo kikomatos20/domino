@@ -12,6 +12,7 @@ import {
   newMatch,
   nextRound,
   parseTile,
+  TARGET_SCORE,
   tilePips,
 } from "@/engine/engine";
 import { chooseMove } from "@/engine/ai";
@@ -40,15 +41,36 @@ export default function Game() {
   const [ends, setEnds] = useState<EndAnchors>({ left: null, right: null });
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [reviewing, setReviewing] = useState(false);
+  /**
+   * Nothing is dealt until the difficulty is chosen.
+   *
+   * It used to be a dropdown in the scoreboard, which meant the first round was
+   * always medium whether you wanted it or not — you could only correct it once
+   * the hand you were already playing had been dealt.
+   */
+  const [started, setStarted] = useState(false);
+  /** The five-doubles house rule, off unless this table asks for it. */
+  const [noFiveDoubles, setNoFiveDoubles] = useState(false);
   /** The round whose capicúa has already had its moment. */
   const [capicuaRound, setCapicuaRound] = useState<number | null>(null);
   /** History of the round just finished, kept so review survives the next deal. */
   const [lastRound, setLastRound] = useState<GameState["history"]>([]);
 
-  // Create the match client-side to avoid SSR/client random mismatch.
+  // Remember the last level chosen, so the question is one tap next time.
   useEffect(() => {
-    setState(newMatch());
+    const saved = window.localStorage.getItem("domino:difficulty");
+    if (saved === "easy" || saved === "medium" || saved === "hard") setDifficulty(saved);
+    setNoFiveDoubles(window.localStorage.getItem("domino:noFiveDoubles") === "1");
   }, []);
+
+  /** The deal limit this table is playing under, or null for the plain shuffle. */
+  const maxDoubles = noFiveDoubles ? 4 : null;
+
+  // Created client-side to avoid an SSR/client random mismatch, and only once
+  // the difficulty has been settled.
+  useEffect(() => {
+    if (started && !state) setState(newMatch(Math.random, TARGET_SCORE, maxDoubles));
+  }, [started, state, maxDoubles]);
 
   const myMoves = useMemo(
     () => (state ? legalMoves(state, HUMAN) : []),
@@ -104,8 +126,9 @@ export default function Game() {
       opponentScore: them,
       rounds: state.roundNumber,
       matchId: state.matchId,
+      difficulty,
     });
-  }, [state?.matchOver, state?.matchScore, state?.roundNumber]);
+  }, [state?.matchOver, state?.matchScore, state?.roundNumber, difficulty]);
 
   // Keep the finished round's history available for review.
   useEffect(() => {
@@ -123,8 +146,8 @@ export default function Game() {
     if (!state?.roundOver || reportedRound.current === state.roundNumber) return;
     reportedRound.current = state.roundNumber;
     const stat = statsFor(state, HUMAN);
-    if (stat) reportSoloRound(stat);
-  }, [state?.roundOver, state?.roundNumber, state]);
+    if (stat) reportSoloRound(stat, difficulty);
+  }, [state?.roundOver, state?.roundNumber, state, difficulty]);
 
   // Auto-clear pass banner.
   useEffect(() => {
@@ -166,6 +189,70 @@ export default function Game() {
     },
     [state, playHuman]
   );
+
+  if (!started) {
+    return (
+      <main className="home">
+        <AppMenu className="corner" />
+        <div className="home-card">
+          <h1>Play vs Computer</h1>
+          <p className="home-sub">
+            You and your partner against East and West, first to 100.
+          </p>
+
+          <section className="panel">
+            <span className="field-label">How good should they be?</span>
+            <div className="level-picker">
+              {(
+                [
+                  ["easy", "Easy", "Plays for weight and little else."],
+                  ["medium", "Medium", "Sound dominoes, no deep counting."],
+                  ["hard", "Hard", "Counts the table and plays for the tranca."],
+                ] as [Difficulty, string, string][]
+              ).map(([value, label, note]) => (
+                <button
+                  key={value}
+                  className={`level ${difficulty === value ? "on" : ""}`}
+                  aria-pressed={difficulty === value}
+                  onClick={() => setDifficulty(value)}
+                >
+                  <span className="level-name">{label}</span>
+                  <span className="level-note">{note}</span>
+                </button>
+              ))}
+            </div>
+
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={noFiveDoubles}
+                onChange={(e) => setNoFiveDoubles(e.target.checked)}
+              />
+              <span>House rule: redeal if anyone gets five doubles</span>
+            </label>
+
+            <button
+              className="home-button primary"
+              onClick={() => {
+                window.localStorage.setItem("domino:difficulty", difficulty);
+                window.localStorage.setItem(
+                  "domino:noFiveDoubles",
+                  noFiveDoubles ? "1" : "0"
+                );
+                setStarted(true);
+              }}
+            >
+              Deal
+            </button>
+          </section>
+
+          <p className="home-note">
+            You can still change this mid-match from the scoreboard.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   if (!state) {
     return <main className="table-root loading">Setting up the table…</main>;
@@ -290,7 +377,7 @@ export default function Game() {
                     reported.current = false;
                     reportedRound.current = null;
                     setCapicuaRound(null);
-                    setState(newMatch());
+                    setState(newMatch(Math.random, TARGET_SCORE, maxDoubles));
                   }}
                 >
                   New match

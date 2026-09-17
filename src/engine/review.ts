@@ -396,6 +396,69 @@ export function reviewRound(history: MoveRecord[], seat: Seat): RoundReview {
           });
         }
 
+        /*
+         * The cabeza — the last tile of a suit nobody else can answer.
+         *
+         * While that suit sits at an end, the tile is a move you are
+         * guaranteed to have: you cannot be made to pass. That is worth most
+         * when the round is yours to finish — as the mano running your hand
+         * down, or once your partner has passed and getting out falls to you.
+         * So you keep it and play everything else first.
+         *
+         * Note that this is about the half you spend against the table, not
+         * the one you leave showing, which is what the notes above judge.
+         */
+        const heldTheLastOf = (suit: number) =>
+          k.unseenSuit[suit] === 0 && k.suitCount[suit] === 1;
+        // Your partner having passed shifts the round onto you, whatever seat
+        // you started in — the same reason the lead moves when the mano passes.
+        const partnerHasPassed = k.voids[partner].size > 0;
+        const roundIsYoursToFinish = roleNow === "mano" || partnerHasPassed;
+        const wentOut = remaining.length === 0;
+
+        // A cabeza you could have played and did not.
+        const keptACabeza = remaining.some(
+          (id) =>
+            options.some((m) => m.tileId === id) &&
+            (() => {
+              const t = parseTile(id);
+              return heldTheLastOf(t.a) || heldTheLastOf(t.b);
+            })()
+        );
+
+        if (heldTheLastOf(endBefore) && !wentOut && !closesRound) {
+          if (roundIsYoursToFinish) {
+            solo(
+              {
+                kind: "minus",
+                text: `That was your cabeza — the last ${endBefore} anybody holds. While a ${endBefore} was showing you could never be made to pass; spending it ${
+                  roleNow === "mano"
+                    ? "while you hold the lead"
+                    : "after your partner has passed"
+                } gives up the one move you were sure of. Play your other tiles first and keep it for when you need it.`,
+              },
+              -2
+            );
+          } else {
+            principles.push({
+              kind: "info",
+              text: `That was the last ${endBefore} anybody holds. Worth keeping when the round is yours to finish; less so from where you were sitting.`,
+            });
+          }
+        } else if (keptACabeza && roundIsYoursToFinish) {
+          solo(
+            {
+              kind: "plus",
+              text: `Kept your cabeza and played something else — while that suit is at an end you always have a move, and ${
+                roleNow === "mano"
+                  ? "as the mano that is how you run your hand out without passing"
+                  : "with your partner passing, reaching the end of the round is on you"
+              }.`,
+            },
+            2
+          );
+        }
+
         // --- your partner ---
         // Your partner only needs one end. Shutting them out means closing the
         // last door they had, not merely leaving a suit they cannot use.

@@ -15,6 +15,10 @@ import {
   takeSeat,
   updateSettings,
   viewFor,
+  answerLook,
+  askToSee,
+  stopShowing,
+  watchRoom,
 } from "./rooms";
 import { RoomError } from "./types";
 import type { Room, RoomStore } from "./types";
@@ -57,6 +61,145 @@ async function playCurrent(code: string, tokens: string[]): Promise<void> {
   void tokens;
 }
 
+describe("watching", () => {
+  /** A table mid-match with one signed-in watcher standing behind it. */
+  async function tableWithWatcher() {
+    const { code, tokens } = await fourPlayers();
+    await startMatch(store, code, tokens[0]);
+    const { token: watch } = await watchRoom(store, code, "Dresh", "user-dresh");
+    const id = (await get(code)).watchers![0].id;
+    return { code, tokens, watch, id };
+  }
+
+  it("lets a signed-in account watch a table that is already full and playing", async () => {
+    const { code, watch } = await tableWithWatcher();
+    const view = viewFor(await get(code), watch);
+    expect(view.watching).toMatchObject({ nickname: "Dresh" });
+    // No seat, no hand, nothing to play.
+    expect(view.you).toBeNull();
+    expect(view.game!.hand).toEqual([]);
+    expect(view.game!.legalMoves).toEqual([]);
+    expect(view.game!.mustPass).toBe(false);
+  });
+
+  it("turns a guest away, because consent needs somebody to give it to", async () => {
+    const { code, tokens } = await fourPlayers();
+    await startMatch(store, code, tokens[0]);
+    await expect(watchRoom(store, code, "Nobody", null)).rejects.toThrow(/sign in/i);
+  });
+
+  it("shows a watcher nothing until a player says yes", async () => {
+    const { code, tokens, watch, id } = await tableWithWatcher();
+
+    expect(viewFor(await get(code), watch).game!.shown).toEqual([]);
+
+    await askToSee(store, code, watch, 1);
+    // Asking alone reveals nothing.
+    expect(viewFor(await get(code), watch).game!.shown).toEqual([]);
+
+    await answerLook(store, code, tokens[1], id, true);
+    const shown = viewFor(await get(code), watch).game!.shown!;
+    expect(shown).toHaveLength(1);
+    expect(shown[0].seat).toBe(1);
+    expect(shown[0].hand).toEqual((await get(code)).game!.hands[1]);
+  });
+
+  it("shows only the hand that was given, not the other three", async () => {
+    const { code, tokens, watch, id } = await tableWithWatcher();
+    await askToSee(store, code, watch, 1);
+    await answerLook(store, code, tokens[1], id, true);
+
+    const view = viewFor(await get(code), watch);
+    const room = await get(code);
+    const leaked = view.game!.shown!.map((s) => s.seat);
+    expect(leaked).toEqual([1]);
+
+    // Nothing anywhere else in the payload carries another seat's tiles.
+    const serialised = JSON.stringify({ ...view, game: { ...view.game, shown: null } });
+    for (const seat of [0, 2, 3] as Seat[]) {
+      for (const tile of room.game!.hands[seat]) {
+        expect(serialised).not.toContain(tile);
+      }
+    }
+  });
+
+  it("lets the player refuse, and refusing reveals nothing", async () => {
+    const { code, tokens, watch, id } = await tableWithWatcher();
+    await askToSee(store, code, watch, 2);
+    await answerLook(store, code, tokens[2], id, false);
+
+    const view = viewFor(await get(code), watch);
+    expect(view.game!.shown).toEqual([]);
+    expect(view.watchers![0].asking).toBeNull();
+  });
+
+  it("refuses to let anyone answer on another player's behalf", async () => {
+    const { code, tokens, watch, id } = await tableWithWatcher();
+    await askToSee(store, code, watch, 2);
+
+    // Not their partner, and not the host either.
+    await expect(answerLook(store, code, tokens[0], id, true)).rejects.toThrow(/did not ask you/i);
+    await expect(answerLook(store, code, tokens[3], id, true)).rejects.toThrow(/did not ask you/i);
+    expect(viewFor(await get(code), watch).game!.shown).toEqual([]);
+  });
+
+  it("lets a player take it back at any point", async () => {
+    const { code, tokens, watch, id } = await tableWithWatcher();
+    await askToSee(store, code, watch, 1);
+    await answerLook(store, code, tokens[1], id, true);
+    expect(viewFor(await get(code), watch).game!.shown).toHaveLength(1);
+
+    await stopShowing(store, code, tokens[1], id);
+    expect(viewFor(await get(code), watch).game!.shown).toEqual([]);
+  });
+
+  it("forgets every consent when a match starts", async () => {
+    // Agreed to in the lobby, where there is nothing yet to show.
+    const { code, tokens } = await fourPlayers();
+    const { token: watch } = await watchRoom(store, code, "Dresh", "user-dresh");
+    const id = (await get(code)).watchers![0].id;
+    await askToSee(store, code, watch, 1);
+    await answerLook(store, code, tokens[1], id, true);
+    expect((await get(code)).watchers![0].allowed).toEqual([1]);
+
+    // Dealing asks the question again rather than inheriting the answer.
+    await startMatch(store, code, tokens[0]);
+    expect((await get(code)).watchers![0].allowed).toEqual([]);
+    expect(viewFor(await get(code), watch).game!.shown).toEqual([]);
+  });
+
+  it("gives a forged or stale token nothing at all", async () => {
+    const { code, tokens, watch, id } = await tableWithWatcher();
+    await askToSee(store, code, watch, 1);
+    await answerLook(store, code, tokens[1], id, true);
+
+    // A token belonging to nobody is a stranger, not a watcher.
+    const stranger = viewFor(await get(code), "not-a-real-token");
+    expect(stranger.watching).toBeNull();
+    expect(stranger.game).toBeNull();
+
+    // And one watcher's consent is not another's.
+    const { token: other } = await watchRoom(store, code, "Babo", "user-babo");
+    expect(viewFor(await get(code), other).game!.shown).toEqual([]);
+  });
+
+  it("keeps a seated player out of the watchers, even on a shared account", async () => {
+    const { room, token } = await createRoom(store, { nickname: "Kiko", userId: "user-kiko" });
+    await expect(watchRoom(store, room.code, "Kiko", "user-kiko")).rejects.toThrow(
+      /already playing/i
+    );
+    void token;
+  });
+
+  it("lets a watcher talk, labelled so nobody mistakes them for a player", async () => {
+    const { code, watch } = await tableWithWatcher();
+    await postChat(store, code, watch, "nice tile");
+    const line = (await get(code)).chat.filter((c) => c.kind === "chat").at(-1)!;
+    expect(line.who).toBe("Dresh (watching)");
+    expect(line.seat).toBeNull();
+  });
+});
+
 describe("lobby", () => {
   it("creates a room with a shareable code and seats the host", async () => {
     const { room, token } = await createRoom(store, { nickname: "Kiko" });
@@ -71,6 +214,37 @@ describe("lobby", () => {
     await expect(joinRoom(store, code, "Extra")).rejects.toThrow(/full/i);
     const room = await get(code);
     expect(room.players.map((p) => p.seat).sort()).toEqual([0, 1, 2, 3]);
+  });
+
+  it("lets the host turn the five-doubles house rule on and off", async () => {
+    const { room, token } = await createRoom(store, { nickname: "Kiko" });
+    expect(room.maxDoubles ?? null).toBeNull();
+
+    const on = await updateSettings(store, room.code, token, { maxDoubles: 4 });
+    expect(on.maxDoubles).toBe(4);
+    expect(on.chat.some((c) => /house rule on/i.test(c.text))).toBe(true);
+
+    const off = await updateSettings(store, room.code, token, { maxDoubles: null });
+    expect(off.maxDoubles).toBeNull();
+    expect(off.chat.some((c) => /house rule off/i.test(c.text))).toBe(true);
+  });
+
+  it("only lets the host change the rules, and only before the deal", async () => {
+    const { code, tokens } = await fourPlayers();
+    await expect(
+      updateSettings(store, code, tokens[1], { maxDoubles: 4 })
+    ).rejects.toThrow(/only the host/i);
+
+    await updateSettings(store, code, tokens[0], { maxDoubles: 4 });
+    await startMatch(store, code, tokens[0]);
+
+    // Nobody changes the terms once the tiles are out.
+    await expect(
+      updateSettings(store, code, tokens[0], { maxDoubles: null })
+    ).rejects.toThrow(/before the match starts/i);
+
+    const room = await get(code);
+    expect(room.game!.maxDoubles).toBe(4);
   });
 
   it("is case-insensitive about codes", async () => {

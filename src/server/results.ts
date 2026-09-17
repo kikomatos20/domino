@@ -67,6 +67,9 @@ export async function recordMatch(room: Room, game: GameState): Promise<void> {
         opponent_score: game.matchScore[1 - team],
         rounds: game.roundNumber,
         partner_name: partner?.nickname ?? "Computer",
+        // Which level the computers were on, so "the bot is trash" can be tied
+        // to a difficulty rather than guessed at.
+        difficulty: room.difficulty,
         // Who actually sat down. A room full of computers is a solo game with
         // a room code, and must not count as a win against people.
         humans: room.players.length,
@@ -90,6 +93,7 @@ export async function recordSolo(
     opponentScore: number;
     rounds: number;
     matchId?: string;
+    difficulty?: string;
   }
 ): Promise<void> {
   const db = admin();
@@ -98,6 +102,7 @@ export async function recordSolo(
     user_id: userId,
     room_code: null,
     match_id: result.matchId ?? null,
+    difficulty: result.difficulty ?? null,
     won: result.won,
     team_score: result.teamScore,
     opponent_score: result.opponentScore,

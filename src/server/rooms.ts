@@ -12,6 +12,7 @@ import {
   applyPass,
   handPips,
   legalMoves,
+  MIN_DOUBLE_LIMIT,
   mustPass,
   newMatch,
   nextRound,
@@ -23,7 +24,7 @@ import { recordRound } from "./roundStats";
 import type { Difficulty } from "@/engine/ai";
 import type { GameState, Move, Seat, TileId } from "@/engine/types";
 import { RoomError } from "./types";
-import type { ChatEntry, Player, PlayerView, Room, RoomStore } from "./types";
+import type { ChatEntry, Player, PlayerView, Room, RoomStore, Watcher } from "./types";
 
 const SEATS: Seat[] = [0, 1, 2, 3];
 
@@ -163,6 +164,7 @@ export interface CreateOptions {
   fillWithAi?: boolean;
   difficulty?: Difficulty;
   target?: number;
+  maxDoubles?: number | null;
   random?: () => number;
   /** The account opening the table, if they were signed in. */
   userId?: string | null;
@@ -187,6 +189,7 @@ export async function createRoom(
     fillWithAi: opts.fillWithAi ?? true,
     difficulty: opts.difficulty ?? "medium",
     target: opts.target ?? 100,
+    maxDoubles: opts.maxDoubles ?? null,
     hostToken: token,
     players: [
       {
@@ -240,6 +243,207 @@ export async function joinRoom(
   say(room, { kind: "event", seat: open[0], who: "", text: `${name} sat down` });
   await save(store, room);
   return { room, token };
+}
+
+// ------------------------------------------------------------- watching
+
+/** How many people can stand behind the players at once. */
+const MAX_WATCHERS = 6;
+
+function watcherOf(room: Room, token: string): Watcher | null {
+  return (room.watchers ?? []).find((w) => w.token === token) ?? null;
+}
+
+function requireWatcher(room: Room, token: string): Watcher {
+  const watcher = watcherOf(room, token);
+  if (!watcher) throw new RoomError("You are not watching this room", 403);
+  return watcher;
+}
+
+/**
+ * Watch a table without taking a seat.
+ *
+ * Open whether or not the table is full, and whether or not the match has
+ * started — turning up halfway through is the normal way anyone ends up
+ * watching dominoes.
+ *
+ * An account is required. Consent to show a hand is given to a person, and a
+ * guest nickname is not a person: anyone could type "Dresh" and be handed the
+ * tiles the real Dresh was shown.
+ */
+export async function watchRoom(
+  store: RoomStore,
+  code: string,
+  nickname: string,
+  userId: string | null,
+  random: () => number = Math.random
+): Promise<{ room: Room; token: string }> {
+  const room = await mustGet(store, code);
+  if (!userId) throw new RoomError("Sign in to watch a table", 401);
+  if ((room.banned ?? []).includes(userId)) {
+    throw new RoomError("The host removed you from this table", 403);
+  }
+  if (room.players.some((p) => p.userId === userId)) {
+    throw new RoomError("You are already playing at this table", 409);
+  }
+
+  const existing = (room.watchers ?? []).find((w) => w.userId === userId);
+  if (existing) {
+    // Same person on a new device or after a reload. Reuse the identity so the
+    // consents they were given survive; a fresh token would quietly drop them.
+    existing.connected = true;
+    existing.lastSeen = Date.now();
+    await save(store, room);
+    return { room, token: existing.token };
+  }
+
+  if ((room.watchers ?? []).length >= MAX_WATCHERS) {
+    throw new RoomError("Too many people are watching already", 409);
+  }
+
+  const token = makeToken(random);
+  const watcher: Watcher = {
+    id: makeToken(random).slice(0, 8),
+    token,
+    nickname: cleanNickname(nickname),
+    userId,
+    connected: true,
+    lastSeen: Date.now(),
+    allowed: [],
+    asking: null,
+  };
+  room.watchers = [...(room.watchers ?? []), watcher];
+  say(room, {
+    kind: "event",
+    seat: null,
+    who: "",
+    text: `${watcher.nickname} is watching`,
+  });
+  await save(store, room);
+  return { room, token };
+}
+
+export async function stopWatching(
+  store: RoomStore,
+  code: string,
+  token: string
+): Promise<Room> {
+  const room = await mustGet(store, code);
+  const watcher = watcherOf(room, token);
+  if (!watcher) return room;
+  room.watchers = (room.watchers ?? []).filter((w) => w.token !== token);
+  say(room, {
+    kind: "event",
+    seat: null,
+    who: "",
+    text: `${watcher.nickname} stopped watching`,
+  });
+  await save(store, room);
+  return room;
+}
+
+/**
+ * Ask one player to see their hand.
+ *
+ * A request, not a demand, and aimed at one person: there is no way to ask the
+ * whole table at once, because there is no such thing as the table agreeing on
+ * this. One open question at a time, so nobody can paper the room with them.
+ */
+export async function askToSee(
+  store: RoomStore,
+  code: string,
+  token: string,
+  seat: Seat
+): Promise<Room> {
+  const room = await mustGet(store, code);
+  const watcher = requireWatcher(room, token);
+  if (!isHuman(room, seat)) throw new RoomError("Nobody is sitting there", 409);
+  if (watcher.allowed.includes(seat)) return room;
+
+  watcher.asking = seat;
+  say(room, {
+    kind: "event",
+    seat,
+    who: "",
+    text: `${watcher.nickname} asked ${nameOf(room, seat)} to see their hand`,
+  });
+  await save(store, room);
+  return room;
+}
+
+/**
+ * Answer a watcher's request — your own hand, your own decision.
+ *
+ * Only the player who was asked can answer. Not their partner, not the host:
+ * this is the one thing at the table that is nobody else's to give.
+ */
+export async function answerLook(
+  store: RoomStore,
+  code: string,
+  token: string,
+  watcherId: string,
+  allow: boolean
+): Promise<Room> {
+  const room = await mustGet(store, code);
+  const player = requirePlayer(room, token);
+  const watcher = (room.watchers ?? []).find((w) => w.id === watcherId);
+  if (!watcher) throw new RoomError("Nobody is waiting on that", 409);
+  if (watcher.asking !== player.seat) {
+    throw new RoomError("They did not ask you", 403);
+  }
+
+  watcher.asking = null;
+  if (allow && !watcher.allowed.includes(player.seat)) {
+    watcher.allowed = [...watcher.allowed, player.seat];
+  }
+  say(room, {
+    kind: "event",
+    seat: player.seat,
+    who: "",
+    text: allow
+      ? `${player.nickname} is showing ${watcher.nickname} their hand`
+      : `${player.nickname} kept their hand to themselves`,
+  });
+  await save(store, room);
+  return room;
+}
+
+/** Take it back. Allowed at any moment, without explaining why. */
+export async function stopShowing(
+  store: RoomStore,
+  code: string,
+  token: string,
+  watcherId: string
+): Promise<Room> {
+  const room = await mustGet(store, code);
+  const player = requirePlayer(room, token);
+  const watcher = (room.watchers ?? []).find((w) => w.id === watcherId);
+  if (!watcher) return room;
+  if (!watcher.allowed.includes(player.seat)) return room;
+
+  watcher.allowed = watcher.allowed.filter((s) => s !== player.seat);
+  say(room, {
+    kind: "event",
+    seat: player.seat,
+    who: "",
+    text: `${player.nickname} is no longer showing ${watcher.nickname} their hand`,
+  });
+  await save(store, room);
+  return room;
+}
+
+/**
+ * Forget every consent.
+ *
+ * Called when a match starts. Agreeing to show your hand in one match is not
+ * agreeing to show it in the next one, and a permission that quietly outlives
+ * the thing it was given for is not really a permission.
+ */
+function clearConsents(room: Room): void {
+  for (const watcher of room.watchers ?? []) {
+    watcher.allowed = [];
+    watcher.asking = null;
+  }
 }
 
 /**
@@ -399,13 +603,38 @@ export async function updateSettings(
   store: RoomStore,
   code: string,
   token: string,
-  settings: { fillWithAi?: boolean; difficulty?: Difficulty; target?: number }
+  settings: {
+    fillWithAi?: boolean;
+    difficulty?: Difficulty;
+    target?: number;
+    maxDoubles?: number | null;
+  }
 ): Promise<Room> {
   const room = await mustGet(store, code);
   if (token !== room.hostToken) throw new RoomError("Only the host can change settings", 403);
+  // A match already dealt keeps the rule it was dealt under, so nobody can
+  // change the terms between rounds.
+  if (room.status !== "lobby") {
+    throw new RoomError("You can only change the table's rules before the match starts", 409);
+  }
   if (settings.fillWithAi !== undefined) room.fillWithAi = settings.fillWithAi;
   if (settings.difficulty) room.difficulty = settings.difficulty;
   if (settings.target) room.target = settings.target;
+  if (settings.maxDoubles !== undefined) {
+    const next = settings.maxDoubles === null ? null : Math.max(MIN_DOUBLE_LIMIT, settings.maxDoubles);
+    if (next !== (room.maxDoubles ?? null)) {
+      room.maxDoubles = next;
+      say(room, {
+        kind: "event",
+        seat: null,
+        who: "",
+        text:
+          next === null
+            ? "House rule off: hands are dealt as they fall"
+            : `House rule on: no hand starts with more than ${next} doubles`,
+      });
+    }
+  }
   await save(store, room);
   return room;
 }
@@ -452,7 +681,17 @@ export async function heartbeat(
   const room = await store.get(code);
   if (!room) return;
   const player = seatOf(room, token);
-  if (!player) return;
+  if (!player) {
+    // Watchers ping too — it is how the table knows someone wandered off,
+    // which matters when that someone can see a hand.
+    const watcher = watcherOf(room, token);
+    if (!watcher) return;
+    const returning = !watcher.connected;
+    watcher.connected = true;
+    watcher.lastSeen = Date.now();
+    if (returning) await save(store, room);
+    return;
+  }
   const wasDisconnected = !player.connected;
   player.connected = true;
   player.lastSeen = Date.now();
@@ -483,7 +722,9 @@ export async function startMatch(
   }
 
   room.status = "playing";
-  room.game = newMatch(Math.random, room.target);
+  // A new match asks the question again.
+  clearConsents(room);
+  room.game = newMatch(Math.random, room.target, room.maxDoubles ?? null);
   say(room, {
     kind: "event",
     seat: null,
@@ -674,10 +915,21 @@ export async function postChat(
   text: string
 ): Promise<Room> {
   const room = await mustGet(store, code);
-  const player = requirePlayer(room, token);
+  const player = seatOf(room, token);
+  const watcher = player ? null : watcherOf(room, token);
+  if (!player && !watcher) throw new RoomError("You are not in this room", 403);
+
   const message = (text ?? "").trim().slice(0, MAX_CHAT_LENGTH);
   if (!message) throw new RoomError("Nothing to say");
-  say(room, { kind: "chat", seat: player.seat, who: player.nickname, text: message });
+  say(room, {
+    kind: "chat",
+    // No seat, so the line cannot be mistaken for a player's — someone
+    // watching may well be able to see a hand, and what they say has to read
+    // as coming from outside the game.
+    seat: player ? player.seat : null,
+    who: player ? player.nickname : `${watcher!.nickname} (watching)`,
+    text: message,
+  });
   await save(store, room);
   return room;
 }
@@ -730,6 +982,9 @@ async function advanceAi(room: Room): Promise<void> {
  */
 export function viewFor(room: Room, token: string | null): PlayerView {
   const me = token ? seatOf(room, token) : null;
+  // A token is one or the other, never both — you cannot watch a table you are
+  // sitting at. Seat first, so a seated player is never treated as a watcher.
+  const watcher = !me && token ? watcherOf(room, token) : null;
   const game = room.game;
 
   const seats = SEATS.map((seat) => {
@@ -755,16 +1010,37 @@ export function viewFor(room: Room, token: string | null): PlayerView {
     status: room.status,
     version: room.version,
     you: me ? { seat: me.seat, nickname: me.nickname, isHost: me.token === room.hostToken } : null,
+    watching: watcher ? { id: watcher.id, nickname: watcher.nickname } : null,
+    // Tokens stay behind. Everything here is public by design: everyone at the
+    // table should be able to see who is watching and what each of them has
+    // been shown, including the watchers themselves.
+    watchers: (room.watchers ?? []).map((w) => ({
+      id: w.id,
+      nickname: w.nickname,
+      connected: w.connected,
+      allowed: [...w.allowed],
+      asking: w.asking,
+    })),
     fillWithAi: room.fillWithAi,
     difficulty: room.difficulty,
     target: room.target,
+    maxDoubles: room.maxDoubles ?? null,
     seats,
     swaps,
     chat: room.chat ?? [],
     game:
-      game && me
+      game && (me || watcher)
         ? {
-            hand: [...game.hands[me.seat]],
+            // A watcher holds nothing, and is shown only what they were given.
+            hand: me ? [...game.hands[me.seat]] : [],
+            ...(watcher
+              ? {
+                  shown: watcher.allowed.map((seat) => ({
+                    seat,
+                    hand: [...game.hands[seat]],
+                  })),
+                }
+              : {}),
             line: game.line,
             leftEnd: game.leftEnd,
             rightEnd: game.rightEnd,
@@ -776,8 +1052,9 @@ export function viewFor(room: Room, token: string | null): PlayerView {
             roundOver: game.roundOver,
             matchOver: game.matchOver,
             lastAction: game.lastAction,
-            legalMoves: legalMoves(game, me.seat),
-            mustPass: mustPass(game, me.seat),
+            // Nothing to play and nothing to be prompted about.
+            legalMoves: me ? legalMoves(game, me.seat) : [],
+            mustPass: me ? mustPass(game, me.seat) : false,
             // Each history entry carries a snapshot of *all four* hands, which
             // is exactly what the review needs and exactly what an opponent
             // must never see. Only send it once the round is over and the

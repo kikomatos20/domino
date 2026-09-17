@@ -499,6 +499,133 @@ describe("reviewRound", () => {
     }
   });
 
+  /**
+   * Kiko's own note, twice over: the last tile of a suit nobody else can
+   * answer is a move you are guaranteed to have, and you keep it while getting
+   * out is your job.
+   *
+   * The position below is built so suit 3 is exactly exhausted — six of the
+   * seven 3s are on the table and seat 0 holds the seventh — and seat 0 holds
+   * the fewest tiles, so the lead is theirs.
+   */
+  const cabezaLine = [
+    { left: 3, right: 0 },
+    { left: 0, right: 0 },
+    { left: 0, right: 1 },
+    { left: 1, right: 3 },
+    { left: 3, right: 3 },
+    { left: 3, right: 2 },
+    { left: 2, right: 2 },
+    { left: 2, right: 4 },
+    { left: 4, right: 3 },
+    { left: 3, right: 5 },
+    { left: 5, right: 5 },
+  ].map((t) => ({ ...t, seat: 1 as Seat }));
+
+  const cabezaTable = { line: cabezaLine, leftEnd: 3, rightEnd: 5 };
+
+  it("marks spending the cabeza while you hold the lead", () => {
+    const history: MoveRecord[] = [
+      {
+        seat: 0,
+        kind: "play",
+        // The 3-6 is the last 3 in the game, and it goes on the 3.
+        move: { tileId: "3-6", end: "left" },
+        before: snap({
+          ...cabezaTable,
+          hands: [["3-6", "5-6"], ["0-5", "1-5", "2-5"], ["0-4", "1-4"], ["4-5", "0-2", "1-2"]],
+        }),
+      },
+    ];
+    const move = reviewRound(history, 0).moves[0];
+    const note = move.principles.find((n) => /cabeza/.test(n.text));
+    expect(note).toBeDefined();
+    expect(note!.kind).toBe("minus");
+    expect(note!.text).toMatch(/last 3 anybody holds/);
+  });
+
+  it("credits keeping it and playing something else instead", () => {
+    const history: MoveRecord[] = [
+      {
+        seat: 0,
+        kind: "play",
+        // The 5-6 goes on the 5, and the cabeza stays in hand.
+        move: { tileId: "5-6", end: "right" },
+        before: snap({
+          ...cabezaTable,
+          hands: [["3-6", "5-6"], ["0-5", "1-5", "2-5"], ["0-4", "1-4"], ["4-5", "0-2", "1-2"]],
+        }),
+      },
+    ];
+    const move = reviewRound(history, 0).moves[0];
+    const note = move.principles.find((n) => /Kept your cabeza/.test(n.text));
+    expect(note).toBeDefined();
+    expect(note!.kind).toBe("plus");
+  });
+
+  it("does not scold a seat the round does not depend on", () => {
+    const history: MoveRecord[] = [
+      {
+        seat: 0,
+        kind: "play",
+        move: { tileId: "3-6", end: "left" },
+        before: snap({
+          ...cabezaTable,
+          // Four tiles here, two for the partner: the lead is not seat 0's.
+          hands: [
+            ["3-6", "5-6", "6-6", "0-6"],
+            ["0-5", "1-5", "2-5"],
+            ["0-4", "1-4"],
+            ["4-5", "0-2", "1-2"],
+          ],
+        }),
+      },
+    ];
+    const note = reviewRound(history, 0).moves[0].principles.find((n) =>
+      /last 3 anybody holds/.test(n.text)
+    );
+    expect(note).toBeDefined();
+    expect(note!.kind).toBe("info");
+  });
+
+  it("never calls something a cabeza that was not one", () => {
+    /** Recomputed from the raw position, independently of the review. */
+    const wasTheLastOf = (before: Snapshot, seat: Seat, suit: number) => {
+      const mine = before.hands[seat];
+      const held = mine.filter((id) => id.split("-").map(Number).includes(suit));
+      if (held.length !== 1) return false;
+      const onTable = new Set(
+        before.line.map((t) =>
+          [Math.min(t.left, t.right), Math.max(t.left, t.right)].join("-")
+        )
+      );
+      for (let other = 0; other <= 6; other++) {
+        const id = [Math.min(other, suit), Math.max(other, suit)].join("-");
+        if (!onTable.has(id) && !mine.includes(id)) return false;
+      }
+      return true;
+    };
+
+    let checked = 0;
+    for (let seed = 0; seed < 120; seed++) {
+      const s = playRound(newMatch(seededRng(1200 + seed)));
+      for (const me of [0, 1, 2, 3] as Seat[]) {
+        const plays = s.history.filter((r) => r.seat === me && r.kind === "play");
+        for (const m of reviewRound(s.history, me).moves) {
+          const spent = m.principles.find((n) => /anybody holds/.test(n.text));
+          if (!spent) continue;
+          const rec = plays[m.number - 1];
+          const matched =
+            rec.move!.end === "left" ? rec.before.leftEnd! : rec.before.rightEnd!;
+          expect(wasTheLastOf(rec.before, me, matched)).toBe(true);
+          checked++;
+        }
+      }
+    }
+    // Vacuously true is not a passing test — say so if the case never arose.
+    expect(checked).toBeGreaterThan(0);
+  });
+
   it("is deterministic — the same round reviews the same way twice", () => {
     const s = playRound(newMatch(seededRng(61)));
     const a = reviewRound(s.history, 0);

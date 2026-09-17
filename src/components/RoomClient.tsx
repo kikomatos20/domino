@@ -9,6 +9,7 @@ import {
   saveNickname,
   savedNickname,
   savedToken,
+  watchRoom as watchTable,
 } from "@/lib/client";
 import { useRouter } from "next/navigation";
 import type { PlayerView } from "@/server/types";
@@ -215,9 +216,23 @@ export default function RoomClient({ code }: { code: string }) {
     return <main className="table-root loading">Finding the table…</main>;
   }
 
-  // Arrived by link without a seat: offer to join.
-  if (!view.you) {
+  // Arrived by link without a seat: offer to join, or to watch.
+  if (!view.you && !view.watching) {
     const full = view.seats.every((s) => s.nickname);
+    const watch = async () => {
+      setBusy(true);
+      setError(null);
+      try {
+        const { view: next } = await watchTable(view.code);
+        version.current = next.version;
+        setView(next);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not watch this table");
+      } finally {
+        setBusy(false);
+      }
+    };
+
     return (
       <main className="home">
         <div className="home-card">
@@ -260,6 +275,19 @@ export default function RoomClient({ code }: { code: string }) {
               </button>
             </>
           )}
+
+          {/*
+            Always on offer, full table or not. Watching is the whole reason
+            somebody turns up to a game they are not in.
+          */}
+          <button className="home-button secondary" disabled={busy} onClick={watch}>
+            Watch instead
+          </button>
+          <p className="home-note">
+            Watching shows the table and the score. To see somebody&rsquo;s hand you
+            have to ask them, and it is theirs to refuse. Takes an account.
+          </p>
+
           {error && <p className="error">{error}</p>}
           <Link className="back-link" href="/online">
             ← Back
@@ -298,6 +326,15 @@ export default function RoomClient({ code }: { code: string }) {
       onReady={(ready: boolean) => send({ action: "ready", ready })}
       onChat={(text: string) => send({ action: "chat", text })}
       onLobby={() => send({ action: "lobby" })}
+      onAskToSee={(seat: Seat) => send({ action: "ask", seat })}
+      onAnswerLook={(watcherId: string, allow: boolean) =>
+        send({ action: "answerLook", watcherId, allow })
+      }
+      onStopShowing={(watcherId: string) => send({ action: "stopShowing", watcherId })}
+      onStopWatching={async () => {
+        await send({ action: "stopWatching" });
+        router.push("/online");
+      }}
     />
   );
 }

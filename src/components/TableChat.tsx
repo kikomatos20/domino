@@ -23,7 +23,8 @@ export default function TableChat({
   headerExtra,
 }: {
   chat: ChatEntry[];
-  you: Seat;
+  /** Your seat, or null if you are watching rather than playing. */
+  you: Seat | null;
   onSend: (text: string) => void;
   open: boolean;
   onToggle: () => void;

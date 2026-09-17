@@ -27,12 +27,19 @@ function admin(): SupabaseClient | null {
   return client;
 }
 
-function row(userId: string, roomCode: string | null, stat: RoundStat, humans: number) {
+function row(
+  userId: string,
+  roomCode: string | null,
+  stat: RoundStat,
+  humans: number,
+  difficulty: string | null
+) {
   return {
     user_id: userId,
     room_code: roomCode,
     match_id: stat.matchId,
     humans,
+    difficulty,
     round_number: stat.roundNumber,
     seat: stat.seat,
     role_at_start: stat.roleAtStart,
@@ -68,7 +75,9 @@ export async function recordRound(room: Room, game: GameState): Promise<void> {
     .filter((p) => p.userId)
     .map((p) => {
       const stat = statsFor(game, p.seat);
-      return stat ? row(p.userId as string, room.code, stat, room.players.length) : null;
+      return stat
+        ? row(p.userId as string, room.code, stat, room.players.length, room.difficulty)
+        : null;
     })
     .filter((r): r is ReturnType<typeof row> => r !== null);
 
@@ -81,8 +90,12 @@ export async function recordRound(room: Room, game: GameState): Promise<void> {
 }
 
 /** Store a solo round, reported by the browser that played it. */
-export async function recordSoloRound(userId: string, stat: RoundStat): Promise<void> {
+export async function recordSoloRound(
+  userId: string,
+  stat: RoundStat,
+  difficulty: string | null = null
+): Promise<void> {
   const db = admin();
   if (!db) return;
-  await db.from("round_stats").insert(row(userId, null, stat, 1));
+  await db.from("round_stats").insert(row(userId, null, stat, 1, difficulty));
 }

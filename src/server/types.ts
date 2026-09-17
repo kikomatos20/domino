@@ -28,6 +28,40 @@ export interface Player {
 }
 
 /**
+ * Somebody watching without a seat.
+ *
+ * A watcher sees the table, the score and the talk — the same things anyone
+ * standing behind the players would see. A hand is not one of those things. To
+ * see one they have to ask that player, and that player decides. Nobody at the
+ * table can grant it on their partner's behalf, and the host cannot grant it
+ * for everyone: it is each player's own hand to show or keep.
+ */
+export interface Watcher {
+  /**
+   * Public name for this watcher, safe to send to everyone.
+   *
+   * Separate from the token because a seated player has to be able to answer
+   * "Dresh wants to see your hand", which means addressing a watcher by name
+   * in a request — and the token is a credential, not an address.
+   */
+  id: string;
+  token: string;
+  nickname: string;
+  /**
+   * Watching takes an account. Not for the game's sake — for the players': a
+   * hand shown to a guest is a hand shown to a name anyone can type, and
+   * consent given to nobody in particular is not consent.
+   */
+  userId: string;
+  connected: boolean;
+  lastSeen: number;
+  /** Seats that have agreed to let this watcher see their hand. */
+  allowed: Seat[];
+  /** A seat they have asked and are waiting on, if any. One at a time. */
+  asking: Seat | null;
+}
+
+/**
  * One line in the table talk.
  *
  * Chat and the run of play share a single stream on purpose: "nice tile" reads
@@ -48,8 +82,16 @@ export interface Room {
   fillWithAi: boolean;
   difficulty: Difficulty;
   target: number;
+  /**
+   * House rule: the most doubles anyone may be dealt, or null to play the
+   * shuffle as it falls. Not a rule of dominoes — a table agreement some
+   * groups keep, which is why the host decides it per match.
+   */
+  maxDoubles?: number | null;
   hostToken: string;
   players: Player[];
+  /** People watching without a seat. */
+  watchers?: Watcher[];
   /** Absent until the host starts the match. */
   game?: GameState;
   /** Table talk and the run of play, oldest first. */
@@ -91,9 +133,30 @@ export interface PlayerView {
   status: RoomStatus;
   version: number;
   you: { seat: Seat; nickname: string; isHost: boolean } | null;
+  /**
+   * You are watching rather than playing. `you` stays null — a watcher has no
+   * seat — so this is what tells the interface apart from a stranger reading
+   * the lobby.
+   */
+  watching?: { id: string; nickname: string } | null;
+  /**
+   * Who is watching, and where each of them stands with each player. Everyone
+   * sees this, players and watchers alike: being watched is not something to
+   * find out afterwards.
+   */
+  watchers?: {
+    id: string;
+    nickname: string;
+    connected: boolean;
+    /** Seats that agreed to show this watcher their hand. */
+    allowed: Seat[];
+    /** A seat they have asked and are waiting on. */
+    asking: Seat | null;
+  }[];
   fillWithAi: boolean;
   difficulty: Difficulty;
   target: number;
+  maxDoubles?: number | null;
   seats: {
     seat: Seat;
     nickname: string | null;
@@ -114,8 +177,14 @@ export interface PlayerView {
   swaps: { from: Seat; to: Seat }[];
   chat: ChatEntry[];
   game: {
-    /** Only ever your own tiles. */
+    /** Only ever your own tiles. Empty for a watcher, who holds none. */
     hand: string[];
+    /**
+     * Hands a watcher has been shown, by the players who chose to show them.
+     * Absent for everyone else, and never populated from anything but that
+     * watcher's own list of consents.
+     */
+    shown?: { seat: Seat; hand: string[] }[];
     line: GameState["line"];
     leftEnd: number | null;
     rightEnd: number | null;

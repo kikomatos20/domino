@@ -85,6 +85,27 @@ export async function joinRoom(
   return body;
 }
 
+/**
+ * Watch a table instead of playing at it.
+ *
+ * The token comes back the same way a player's does and is kept in the same
+ * place, so every later request — polling, chat, asking to see a hand — works
+ * without knowing which of the two you are.
+ */
+export async function watchRoom(
+  code: string
+): Promise<{ token: string; view: PlayerView }> {
+  const body = await parse(
+    await fetch(`/api/rooms/${encodeURIComponent(code)}/watch`, {
+      method: "POST",
+      headers: await withSession({ "content-type": "application/json" }),
+      body: "{}",
+    })
+  );
+  saveToken(code, body.token);
+  return body;
+}
+
 export async function fetchView(code: string): Promise<PlayerView> {
   const token = savedToken(code);
   const body = await parse(

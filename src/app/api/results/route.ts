@@ -55,7 +55,11 @@ export async function POST(request: Request) {
 
     // A finished solo round rather than a finished match.
     if (body?.round) {
-      await recordSoloRound(account.id, body.round);
+      await recordSoloRound(
+        account.id,
+        body.round,
+        typeof body?.difficulty === "string" ? body.difficulty : null
+      );
       return NextResponse.json({ ok: true });
     }
 
@@ -72,6 +76,7 @@ export async function POST(request: Request) {
       opponentScore,
       rounds,
       matchId: typeof body?.matchId === "string" ? body.matchId : undefined,
+      difficulty: typeof body?.difficulty === "string" ? body.difficulty : undefined,
     });
     return NextResponse.json({ ok: true });
   } catch (error) {

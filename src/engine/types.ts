@@ -86,6 +86,11 @@ export interface GameState {
    * It also makes a double-recorded result detectable rather than invisible.
    */
   matchId: string;
+  /**
+   * House rule: redeal if anyone holds more doubles than this. Null means play
+   * whatever comes out of the shuffle, which is the actual rule of the game.
+   */
+  maxDoubles?: number | null;
   hands: [TileId[], TileId[], TileId[], TileId[]];
   line: PlacedTile[];
   leftEnd: number | null;

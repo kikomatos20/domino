@@ -395,6 +395,32 @@ export function scoreMoves(
     const exposed = exposedEnd(state, move);
     const other = untouchedEnd(state, move.end);
 
+    /*
+     * Hold the cabeza: the last tile of a suit nobody else can answer.
+     *
+     * While that suit is at an end it is a move you are guaranteed to have, so
+     * you cannot be forced to pass. That insurance is worth most when getting
+     * out is your job — as the mano, or once your partner has passed and the
+     * round falls to you — so spend everything else first.
+     *
+     * The suit at stake is the one this tile covers, not the one it leaves
+     * showing; the note above about a dead exposed end is a different idea.
+     */
+    const matched = move.end === "left" ? state.leftEnd : state.rightEnd;
+    const goingOut = state.hands[seat].length === 1;
+    if (
+      matched !== null &&
+      !goingOut &&
+      k.unseenSuit[matched] === 0 &&
+      k.suitCount[matched] === 1 &&
+      (role === "mano" || k.voids[partner].size > 0)
+    ) {
+      score -= (hard ? 6 : 3) * conviction;
+      reasons.push(
+        `Spends your cabeza — the last ${matched} anyone holds, and the move you could always fall back on`
+      );
+    }
+
     if (exposed !== null) {
       // Squeeze opponents onto suits they have already failed on.
       for (const o of opponents) {

@@ -35,7 +35,11 @@ export default function Lobby({
   onAnswerSwap: (accept: boolean) => void;
   /** Host only, lobby only. */
   onKick: (seat: Seat) => void;
-  onSettings: (s: { fillWithAi?: boolean; difficulty?: string }) => void;
+  onSettings: (s: {
+    fillWithAi?: boolean;
+    difficulty?: string;
+    maxDoubles?: number | null;
+  }) => void;
   onStart: () => void;
   onChat: (text: string) => void;
   busy: boolean;
@@ -176,6 +180,22 @@ export default function Lobby({
                 </select>
               </label>
             )}
+
+            {/*
+              A house rule, not a rule of dominoes — off unless this table
+              agrees to it, which is why the checkbox reads as switching the
+              redeal on rather than allowing the normal deal.
+            */}
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={(view.maxDoubles ?? null) !== null}
+                disabled={busy}
+                onChange={(e) => onSettings({ maxDoubles: e.target.checked ? 4 : null })}
+              />
+              <span>House rule: redeal if anyone gets five doubles</span>
+            </label>
+
             <button
               className="home-button primary"
               disabled={busy || (!view.fillWithAi && humans < 4)}
@@ -191,10 +211,11 @@ export default function Lobby({
         )}
       </div>
 
-      {view.you && (
+      {(view.you || view.watching) && (
         <TableChat
           chat={view.chat ?? []}
-          you={view.you.seat}
+          // A watcher has no seat, so nothing in the log is "theirs".
+          you={view.you?.seat ?? null}
           onSend={onChat}
           open={chatOpen}
           onToggle={() => setChatOpen((o) => !o)}

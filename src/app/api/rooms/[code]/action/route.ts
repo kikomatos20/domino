@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import {
+  answerLook,
+  askToSee,
   heartbeat,
   kickPlayer,
   leaveRoom,
@@ -11,6 +13,8 @@ import {
   respondSwap,
   returnToLobby,
   startMatch,
+  stopShowing,
+  stopWatching,
   takeSeat,
   updateSettings,
   viewFor,
@@ -58,6 +62,12 @@ export async function POST(
           fillWithAi: body.fillWithAi,
           difficulty: body.difficulty,
           target: body.target,
+          maxDoubles:
+            body.maxDoubles === undefined
+              ? undefined
+              : body.maxDoubles === null
+                ? null
+                : Number(body.maxDoubles),
         });
         return NextResponse.json({ view: viewFor(room, token) });
       }
@@ -96,6 +106,28 @@ export async function POST(
       }
       case "leave": {
         const room = await leaveRoom(store, code, token);
+        return NextResponse.json({ view: viewFor(room, token) });
+      }
+      case "ask": {
+        const room = await askToSee(store, code, token, Number(body.seat) as Seat);
+        return NextResponse.json({ view: viewFor(room, token) });
+      }
+      case "answerLook": {
+        const room = await answerLook(
+          store,
+          code,
+          token,
+          String(body.watcherId ?? ""),
+          body.allow === true
+        );
+        return NextResponse.json({ view: viewFor(room, token) });
+      }
+      case "stopShowing": {
+        const room = await stopShowing(store, code, token, String(body.watcherId ?? ""));
+        return NextResponse.json({ view: viewFor(room, token) });
+      }
+      case "stopWatching": {
+        const room = await stopWatching(store, code, token);
         return NextResponse.json({ view: viewFor(room, token) });
       }
       case "ping": {

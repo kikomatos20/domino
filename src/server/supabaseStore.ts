@@ -7,7 +7,7 @@
  */
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { ChatEntry, Room, RoomStore } from "./types";
+import type { ChatEntry, Room, RoomStore, Watcher } from "./types";
 import type { Difficulty } from "@/engine/ai";
 import type { GameState, Seat } from "@/engine/types";
 
@@ -36,10 +36,12 @@ interface RoomRow {
   fill_with_ai: boolean;
   difficulty: Difficulty;
   target: number;
+  max_doubles: number | null;
   host_token: string;
   version: number;
   chat: ChatEntry[] | null;
   banned: string[] | null;
+  watchers: Watcher[] | null;
   updated_at: string;
 }
 
@@ -124,6 +126,7 @@ export function createSupabaseStore(): RoomStore & {
         fillWithAi: room.fill_with_ai,
         difficulty: room.difficulty,
         target: room.target,
+        maxDoubles: room.max_doubles ?? null,
         hostToken: room.host_token,
         players: (players ?? []).map((p) => ({
           seat: p.seat as Seat,
@@ -138,6 +141,7 @@ export function createSupabaseStore(): RoomStore & {
         game: game?.state ?? undefined,
         chat: room.chat ?? [],
         banned: room.banned ?? [],
+        watchers: room.watchers ?? [],
         // Lives on the room, so it is meaningful in the lobby too.
         version: room.version ?? 0,
         updatedAt: new Date(room.updated_at).getTime(),
@@ -154,6 +158,7 @@ export function createSupabaseStore(): RoomStore & {
           fill_with_ai: room.fillWithAi,
           difficulty: room.difficulty,
           target: room.target,
+          max_doubles: room.maxDoubles ?? null,
           host_token: room.hostToken,
         })
         .select("id")
@@ -189,6 +194,7 @@ export function createSupabaseStore(): RoomStore & {
         p_fill: room.fillWithAi,
         p_difficulty: room.difficulty,
         p_target: room.target,
+        p_max_doubles: room.maxDoubles ?? null,
         p_host: room.hostToken,
         p_version: room.version,
         p_players: room.players.map((p) => ({
@@ -207,6 +213,7 @@ export function createSupabaseStore(): RoomStore & {
         // straight back out and the table would reappear over the lobby.
         p_clear_state: !room.game,
         p_banned: room.banned ?? [],
+        p_watchers: room.watchers ?? [],
       });
       if (error) throw error;
     },

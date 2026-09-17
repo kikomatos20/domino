@@ -424,6 +424,60 @@ body {
   text-decoration: underline;
 }
 
+/* ---------- choosing a level before the deal ---------- */
+
+.field-label {
+  font-size: 0.78rem;
+  opacity: 0.75;
+}
+
+.level-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.level {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-left: 4px solid rgba(255, 255, 255, 0.2);
+  border-radius: 9px;
+  padding: 9px 12px;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+}
+
+.level:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.level.on {
+  background: rgba(212, 175, 55, 0.16);
+  border-color: rgba(212, 175, 55, 0.45);
+  border-left-color: var(--gold);
+}
+
+.level-name {
+  display: block;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.level.on .level-name {
+  color: var(--gold);
+}
+
+.level-note {
+  display: block;
+  margin-top: 1px;
+  font-size: 0.74rem;
+  opacity: 0.65;
+}
+
 /* ---------- getting around ---------- */
 
 .app-menu-button {
@@ -1610,6 +1664,134 @@ body {
 .left-pips {
   color: var(--gold);
   font-weight: 700;
+}
+
+/* ---------------------------------------------------------- watching */
+
+/*
+ * A hand shown by consent is marked, always. Someone watching must never have
+ * to work out whether they are looking at tiles a player chose to show them or
+ * tiles the round has finished with.
+ */
+.shown-tag {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.backs.shown {
+  outline: 2px dashed var(--gold);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+.watch-strip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.watch-label {
+  color: #cfe3d4;
+  font-size: 0.85rem;
+  text-align: center;
+  max-width: 34rem;
+}
+
+.watch-hand {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.watch-asks {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.watch-asks button {
+  background: #1d4634;
+  color: #eaf5ec;
+  border: 1px solid #2f6b4f;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.watch-asks button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* Being watched is never silent — you can see it and end it from here. */
+.watch-note {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-size: 0.8rem;
+  color: var(--gold);
+  padding: 4px 0;
+}
+
+.watch-note .link {
+  background: none;
+  border: none;
+  color: #cfe3d4;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: inherit;
+  padding: 0 0 0 4px;
+}
+
+.look-prompt {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 220;
+  background: #10301f;
+  border: 1px solid var(--gold);
+  border-radius: 12px;
+  padding: 16px 20px;
+  text-align: center;
+  color: #eaf5ec;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  max-width: min(92vw, 26rem);
+}
+
+.look-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.look-buttons button {
+  background: var(--gold);
+  color: #14251a;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.look-buttons button.secondary {
+  background: #1d4634;
+  color: #eaf5ec;
+  border: 1px solid #2f6b4f;
+}
+
+.look-note {
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: #9fb8a6;
 }
 
 .backs.vertical {

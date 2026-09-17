@@ -70,7 +70,47 @@ export function shuffle<T>(arr: T[], rng: Rng): T[] {
   return a;
 }
 
-function deal(rng: Rng): [TileId[], TileId[], TileId[], TileId[]] {
+/**
+ * The most doubles in any one hand.
+ *
+ * Seven doubles across four hands means somebody always holds at least two, so
+ * a limit below that could never be met — hence the floor in `deal`.
+ */
+export function mostDoubles(hands: readonly TileId[][]): number {
+  return Math.max(...hands.map((h) => h.filter(isDouble).length));
+}
+
+/** The lowest limit the pigeonhole principle allows. */
+export const MIN_DOUBLE_LIMIT = 2;
+
+/**
+ * Deal four hands of seven.
+ *
+ * `maxDoubles` is a house rule, not a rule of the game: some tables redeal when
+ * a player is dealt five or more doubles. It is off unless asked for, and the
+ * redeal is a fresh shuffle rather than a swap, so the deal stays uniform over
+ * the hands that are actually kept.
+ */
+function deal(
+  rng: Rng,
+  maxDoubles?: number | null
+): [TileId[], TileId[], TileId[], TileId[]] {
+  const limit =
+    typeof maxDoubles === "number" ? Math.max(MIN_DOUBLE_LIMIT, maxDoubles) : null;
+
+  // Bounded: a hand of five-plus doubles turns up about once in 260, so this
+  // almost never loops — but a cap means a bad limit can never hang the table.
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const ids = shuffle(allTiles().map(tileId), rng);
+    const hands: [TileId[], TileId[], TileId[], TileId[]] = [
+      ids.slice(0, 7),
+      ids.slice(7, 14),
+      ids.slice(14, 21),
+      ids.slice(21, 28),
+    ];
+    if (limit === null || mostDoubles(hands) <= limit) return hands;
+  }
+
   const ids = shuffle(allTiles().map(tileId), rng);
   return [ids.slice(0, 7), ids.slice(7, 14), ids.slice(14, 21), ids.slice(21, 28)];
 }
@@ -96,11 +136,16 @@ function makeMatchId(rng: Rng): string {
 }
 
 /** Start a brand-new match (round 1: holder of 6-6 opens with it). */
-export function newMatch(rng: Rng = Math.random, target = TARGET_SCORE): GameState {
-  const hands = deal(rng);
+export function newMatch(
+  rng: Rng = Math.random,
+  target = TARGET_SCORE,
+  maxDoubles: number | null = null
+): GameState {
+  const hands = deal(rng, maxDoubles);
   const opener = hands.findIndex((h) => h.includes("6-6")) as Seat;
   return {
     matchId: makeMatchId(rng),
+    maxDoubles,
     hands,
     line: [],
     leftEnd: null,
@@ -134,7 +179,8 @@ export function nextRound(state: GameState, rng: Rng = Math.random): GameState {
   const opener: Seat = nextSeat(state.opener);
   return {
     ...state,
-    hands: deal(rng),
+    // The house rule belongs to the match, so every deal in it follows.
+    hands: deal(rng, state.maxDoubles),
     line: [],
     leftEnd: null,
     rightEnd: null,

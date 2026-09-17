@@ -230,6 +230,7 @@ export async function reportSolo(result: {
   opponentScore: number;
   rounds: number;
   matchId: string;
+  difficulty: string;
 }): Promise<void> {
   try {
     const headers = await authHeaders();
@@ -245,14 +246,17 @@ export async function reportSolo(result: {
 }
 
 /** Report a finished solo round. Same silence on failure as the match report. */
-export async function reportSoloRound(round: unknown): Promise<void> {
+export async function reportSoloRound(
+  round: unknown,
+  difficulty: string
+): Promise<void> {
   try {
     const headers = await authHeaders();
     if (!headers) return;
     await fetch("/api/results", {
       method: "POST",
       headers: { ...headers, "content-type": "application/json" },
-      body: JSON.stringify({ round }),
+      body: JSON.stringify({ round, difficulty }),
     });
   } catch {
     // Not worth surfacing.
