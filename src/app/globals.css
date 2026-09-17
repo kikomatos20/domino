@@ -636,6 +636,11 @@ body {
   line-height: 1;
 }
 
+/* Nothing to show yet — present, but plainly not a number. */
+.rating-value strong.rating-none {
+  color: #6f8a77;
+}
+
 /* Said next to the number, not in the small print underneath it. */
 .rating-flag {
   font-size: 0.7rem;

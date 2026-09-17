@@ -33,7 +33,7 @@ export default function StatsPanel({ stats }: { stats: Stats }) {
         </p>
       )}
 
-      {stats.rating && <RatingBlock rating={stats.rating} />}
+      <RatingBlock rating={stats.rating} />
 
       <div className="stats-columns">
         <TallyBlock title="Against people" tally={stats.online} rounds={stats.onlineRounds} />
@@ -80,7 +80,30 @@ export default function StatsPanel({ stats }: { stats: Stats }) {
  * and while provisional it is still finding its level. A rating presented
  * without either caveat invites more weight than it can carry.
  */
-function RatingBlock({ rating }: { rating: Rating }) {
+function RatingBlock({ rating }: { rating: Rating | null }) {
+  /*
+   * Nothing yet.
+   *
+   * Shown rather than hidden, and saying what it is waiting for. A block that
+   * quietly vanishes reads as something broken — which is exactly how it read
+   * the first time, when every past match became unrated overnight.
+   */
+  if (!rating) {
+    return (
+      <section className="stats-block rating-block">
+        <h3>Rating</h3>
+        <p className="rating-value">
+          <strong className="rating-none">—</strong>
+        </p>
+        <p className="stats-note">
+          No rated matches yet. A match counts when all four seats are signed in;
+          the host switches it on in the lobby. You get a number after the first
+          one, and it stops being provisional after {PROVISIONAL_UNTIL}.
+        </p>
+      </section>
+    );
+  }
+
   const moved = rating.lastChange;
   const direction = moved > 0.0005 ? "up" : moved < -0.0005 ? "down" : "flat";
 
