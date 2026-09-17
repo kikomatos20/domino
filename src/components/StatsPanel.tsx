@@ -1,11 +1,7 @@
 "use client";
 
-import { nextUp } from "@/engine/achievements";
-import type { Achievement } from "@/engine/achievements";
+import Achievements from "./AchievementList";
 import type { RoundTotals, Stats, Tally } from "@/lib/auth";
-
-/** What you are climbing toward, named by the rung you are standing on. */
-const RUNG_AFTER = ["bronze", "silver", "gold", "platinum"];
 
 /**
  * What you have to show for it.
@@ -70,81 +66,6 @@ export default function StatsPanel({ stats }: { stats: Stats }) {
 
       <Trend rounds={stats.onlineRounds} solo={stats.soloRounds} />
     </div>
-  );
-}
-
-/**
- * Earned against people only.
- *
- * Shown whether earned or not, so you can see what there is to go after — and
- * the one nearest to hand is called out, because a wall of locked badges tells
- * you less than a single reachable target.
- */
-function Achievements({ list }: { list: Achievement[] }) {
-  const earned = list.filter((a) => a.earnedAt);
-  const next = nextUp(list);
-
-  return (
-    <section className="stats-block">
-      <h3>
-        Achievements <span className="stats-figure">{earned.length}/{list.length}</span>
-      </h3>
-
-      {next && (
-        <p className="stats-next">
-          Next up: <strong>{next.name}</strong> — {next.note}
-          {next.progress && next.progress.have > 0 && (
-            <span className="stats-progress">
-              {" "}
-              ({next.progress.have} of {next.progress.need})
-            </span>
-          )}
-        </p>
-      )}
-
-      <ul className="badges">
-        {list.map((a) => {
-          const tier = a.tier;
-          return (
-            <li
-              key={a.id}
-              // The rung names the colour: bronze, silver, gold, platinum.
-              className={`badge ${a.earnedAt ? "won" : ""} rung-${tier?.key ?? "none"}`}
-              title={a.note}
-            >
-              <span className="badge-name">
-                {a.name}
-                {/* Rungs as pips — four filled dots read faster than "4/4". */}
-                {tier && tier.levels > 1 && (
-                  <span
-                    className="badge-rungs"
-                    aria-label={`${tier.level} of ${tier.levels}`}
-                  >
-                    {Array.from({ length: tier.levels }, (_, i) => (
-                      <i key={i} className={i < tier.level ? "on" : ""} />
-                    ))}
-                  </span>
-                )}
-              </span>
-              <span className="badge-note">
-                {!a.earnedAt
-                  ? a.note
-                  : !tier
-                    ? a.earnedAt.slice(0, 10)
-                    : tier.top
-                      ? `${tier.label} · ${tier.times} times`
-                      : `${tier.label} · ${tier.times} of ${a.progress?.need} for ${RUNG_AFTER[tier.level]}`}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-
-      <p className="stats-note">
-        Against people only — the computer does not count. Most of these run
-        bronze, silver, gold, then platinum, which is a long way further than gold.
-      </p>
-    </section>
   );
 }
 

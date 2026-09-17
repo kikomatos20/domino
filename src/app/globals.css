@@ -613,6 +613,25 @@ body {
 .app-menu-item.violet { --accent: #c9a0dc; }
 .app-menu-item.sky { --accent: #5ec4e8; }
 .app-menu-item.leaf { --accent: #7fd6a0; }
+.app-menu-item.amber { --accent: #e8985e; }
+
+/*
+ * The badges, opened over a table.
+ *
+ * Capped and scrollable: the list is fifteen long and a phone in landscape has
+ * very little height, and a dialog you cannot reach the bottom of is worse
+ * than the page it was meant to save you walking to.
+ */
+.badges-dialog {
+  max-width: min(94vw, 40rem);
+  max-height: 80vh;
+  overflow-y: auto;
+  text-align: left;
+}
+
+.badges-dialog .stats-block {
+  margin: 0;
+}
 
 .app-menu-glyph {
   flex: none;

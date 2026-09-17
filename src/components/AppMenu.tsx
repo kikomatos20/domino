@@ -7,10 +7,13 @@ import { useRouter } from "next/navigation";
 import {
   accountsAvailable,
   currentAccount,
+  fetchRecord,
   onAccountChange,
   signOut,
   type Account,
+  type Stats,
 } from "@/lib/auth";
+import AchievementList from "./AchievementList";
 
 /**
  * Getting anywhere from anywhere.
@@ -35,6 +38,16 @@ export default function AppMenu({
   const [account, setAccount] = useState<Account | null>(null);
   /** Where they asked to go, held while we check they meant it. */
   const [leavingTo, setLeavingTo] = useState<string | null>(null);
+  /**
+   * Achievements, shown over the table rather than on a page of their own.
+   *
+   * Walking to /account mid-match means leaving the table, which costs everyone
+   * else the game. The badges are the one part of the record you actually want
+   * while playing — you are three rounds from silver and it would be good to
+   * know that now — so they open in place and close again.
+   */
+  const [badges, setBadges] = useState<Stats | null>(null);
+  const [loadingBadges, setLoadingBadges] = useState(false);
   /** Portals need a document, which the server render does not have. */
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -59,15 +72,17 @@ export default function AppMenu({
     return onAccountChange(setAccount);
   }, []);
 
-  // Escape closes it, like every other dialog in the app.
+  // Escape closes whichever of these is showing, like every other dialog here.
   useEffect(() => {
-    if (!open) return;
+    if (!open && !badges) return;
     const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      setBadges(null);
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [open]);
+  }, [open, badges]);
 
   /**
    * Dialogs go straight to the body.
@@ -144,6 +159,29 @@ export default function AppMenu({
               </Link>
             ))}
 
+            {/* Opens here rather than navigating — the whole point is not
+                leaving the table to look. */}
+            {account && (
+              <button
+                className="app-menu-item amber"
+                onClick={async () => {
+                  setOpen(false);
+                  setLoadingBadges(true);
+                  try {
+                    const data = await fetchRecord();
+                    setBadges(data?.stats ?? null);
+                  } finally {
+                    setLoadingBadges(false);
+                  }
+                }}
+              >
+                <span className="app-menu-glyph" aria-hidden>
+                  🏅
+                </span>
+                Achievements
+              </button>
+            )}
+
             {account && (
               <button
                 className="app-menu-item quiet"
@@ -163,6 +201,42 @@ export default function AppMenu({
               </p>
             )}
           </nav>
+        </div>
+      )}
+
+      {(badges || loadingBadges) && portal(
+        <div
+          className="overlay"
+          onClick={() => {
+            setBadges(null);
+            setLoadingBadges(false);
+          }}
+        >
+          <div
+            className="dialog badges-dialog"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="app-menu-head">
+              <h2>Achievements</h2>
+              <button
+                className="app-menu-close"
+                onClick={() => setBadges(null)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </header>
+
+            {loadingBadges ? (
+              <p className="home-sub">Reading your record…</p>
+            ) : badges ? (
+              <AchievementList list={badges.achievements} heading={false} />
+            ) : (
+              <p className="home-sub">
+                Could not reach your record just now. The game is unaffected.
+              </p>
+            )}
+          </div>
         </div>
       )}
 
