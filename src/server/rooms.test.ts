@@ -114,13 +114,33 @@ describe("watching", () => {
     const leaked = view.game!.shown!.map((s) => s.seat);
     expect(leaked).toEqual([1]);
 
-    // Nothing anywhere else in the payload carries another seat's tiles.
-    const serialised = JSON.stringify({ ...view, game: { ...view.game, shown: null } });
+    /*
+     * Nothing anywhere else in the payload carries another seat's tiles.
+     *
+     * Matched as whole strings rather than as substrings of the serialised
+     * payload. A tile id is two digits and a dash, which turns up inside
+     * perfectly innocent random text — the chat line ids alone produced a
+     * false alarm here. Exact values are what a real leak looks like: a tile
+     * arrives as an element of an array, not as a fragment of a word.
+     */
+    const strings: string[] = [];
+    const walk = (value: unknown): void => {
+      if (typeof value === "string") strings.push(value);
+      else if (Array.isArray(value)) value.forEach(walk);
+      else if (value && typeof value === "object") Object.values(value).forEach(walk);
+    };
+    walk({ ...view, game: { ...view.game, shown: null } });
+
     for (const seat of [0, 2, 3] as Seat[]) {
       for (const tile of room.game!.hands[seat]) {
-        expect(serialised).not.toContain(tile);
+        expect(strings).not.toContain(tile);
       }
     }
+
+    // The check has to be capable of failing: the hand that *was* shown is
+    // present as an exact string, so an actual leak would be caught.
+    walk(view.game!.shown);
+    expect(strings).toContain(room.game!.hands[1][0]);
   });
 
   it("lets the player refuse, and refusing reveals nothing", async () => {

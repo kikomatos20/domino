@@ -194,6 +194,11 @@ export interface RoundTotals {
 
 export interface Stats {
   achievements: import("@/engine/achievements").Achievement[];
+  /**
+   * Your rating, or null until you have played someone. Only means anything
+   * relative to the people you play with.
+   */
+  rating: import("@/engine/rating").Rating | null;
   online: Tally;
   solo: Tally;
   partners: { name: string; played: number; won: number }[];

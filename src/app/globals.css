@@ -615,6 +615,51 @@ body {
 .app-menu-item.leaf { --accent: #7fd6a0; }
 .app-menu-item.amber { --accent: #e8985e; }
 
+/* ------------------------------------------------------------- rating */
+
+.rating-block {
+  text-align: center;
+}
+
+.rating-value {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  margin: 4px 0 8px;
+}
+
+.rating-value strong {
+  font-size: 2.4rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+  line-height: 1;
+}
+
+/* Said next to the number, not in the small print underneath it. */
+.rating-flag {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9fb8a6;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.rating-move {
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.rating-move.up {
+  color: #7fd6a0;
+}
+
+.rating-move.down {
+  color: #e8985e;
+}
+
 /*
  * The badges, opened over a table.
  *

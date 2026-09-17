@@ -12,6 +12,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Room } from "./types";
 import { achievementsFor } from "@/engine/achievements";
 import type { Achievement } from "@/engine/achievements";
+import { ratingsFrom } from "@/engine/rating";
+import type { RatedMatch, Rating } from "@/engine/rating";
 import type { GameState, Seat } from "@/engine/types";
 
 let client: SupabaseClient | null = null;
@@ -149,6 +151,11 @@ export interface RoundTotals {
 export interface Stats {
   /** Earned against people only — see achievements.ts for why. */
   achievements: Achievement[];
+  /**
+   * Null until you have played a rated match. Worked out from the whole pool's
+   * history, because what a result is worth depends on who else was there.
+   */
+  rating: Rating | null;
   online: Tally;
   solo: Tally;
   partners: PartnerRecord[];
@@ -262,6 +269,73 @@ function totals(rows: RoundRow[]): RoundTotals {
  * merging them into a single number would quietly mix two different levels of
  * trust — quite apart from the computer being a different opponent.
  */
+interface PoolRow {
+  match_id: string | null;
+  user_id: string;
+  won: boolean;
+  team_score: number;
+  opponent_score: number;
+  humans: number | null;
+  room_code: string | null;
+  finished_at: string;
+}
+
+/**
+ * Everyone's rating, worked out from everyone's matches.
+ *
+ * A rating cannot be computed from one person's rows. What a result is worth
+ * depends on who was across the table, and their strength comes from matches
+ * you may not have played in. So this reads the pool, not the player.
+ *
+ * That is a whole-table read on every stats page. It stays cheap because the
+ * pool is small and the rows are narrow, and it buys the thing that matters:
+ * nothing is stored, so a constant in the rating can be retuned and every
+ * number re-derives itself correctly on the next load.
+ */
+async function poolRatings(): Promise<Map<string, Rating>> {
+  const db = admin();
+  if (!db) return new Map();
+
+  const { data } = await db
+    .from("match_results")
+    .select("match_id, user_id, won, team_score, opponent_score, humans, room_code, finished_at")
+    .order("finished_at", { ascending: true })
+    .limit(4000);
+
+  const rows = ((data ?? []) as PoolRow[]).filter(againstPeople);
+
+  // One row per player per match, so gather them back into matches. Rows with
+  // no match id predate that column and cannot be grouped — a round of four
+  // ungrouped rows would be read as four separate matches, which would be
+  // worse than leaving them out.
+  const byMatch = new Map<string, PoolRow[]>();
+  for (const row of rows) {
+    if (!row.match_id) continue;
+    byMatch.set(row.match_id, [...(byMatch.get(row.match_id) ?? []), row]);
+  }
+
+  const matches: RatedMatch[] = [];
+  for (const group of byMatch.values()) {
+    const winners = group.filter((r) => r.won);
+    const losers = group.filter((r) => !r.won);
+    // Either side tells us the score; take whichever side we actually have.
+    const sample = winners[0] ?? losers[0];
+    if (!sample) continue;
+    const winningScore = sample.won ? sample.team_score : sample.opponent_score;
+    const losingScore = sample.won ? sample.opponent_score : sample.team_score;
+
+    matches.push({
+      finishedAt: sample.finished_at,
+      teamA: winners.map((r) => r.user_id),
+      teamB: losers.map((r) => r.user_id),
+      scoreA: winningScore,
+      scoreB: losingScore,
+    });
+  }
+
+  return ratingsFrom(matches);
+}
+
 export async function statsFor(userId: string): Promise<Stats> {
   const empty: Tally = { played: 0, won: 0, lost: 0, bestStreak: 0, streak: 0, margin: 0 };
   const noRounds = totals([]);
@@ -274,10 +348,11 @@ export async function statsFor(userId: string): Promise<Stats> {
       onlineRounds: noRounds,
       soloRounds: noRounds,
       achievements: achievementsFor([], []),
+      rating: null,
     };
   }
 
-  const [matches, rounds] = await Promise.all([
+  const [matches, rounds, ratings] = await Promise.all([
     db
       .from("match_results")
       .select("won, team_score, opponent_score, room_code, partner_name, humans, finished_at")
@@ -292,6 +367,7 @@ export async function statsFor(userId: string): Promise<Stats> {
       .eq("user_id", userId)
       .order("finished_at", { ascending: false })
       .limit(2000),
+    poolRatings(),
   ]);
 
   const matchRows = matches.data ?? [];
@@ -317,6 +393,7 @@ export async function statsFor(userId: string): Promise<Stats> {
   const onlineRoundRows = roundRows.filter(againstPeople);
 
   return {
+    rating: ratings.get(userId) ?? null,
     achievements: achievementsFor(
       onlineMatches.map((m) => ({
         won: m.won,

@@ -1,6 +1,8 @@
 "use client";
 
 import Achievements from "./AchievementList";
+import { formatRating, PROVISIONAL_UNTIL } from "@/engine/rating";
+import type { Rating } from "@/engine/rating";
 import type { RoundTotals, Stats, Tally } from "@/lib/auth";
 
 /**
@@ -30,6 +32,8 @@ export default function StatsPanel({ stats }: { stats: Stats }) {
           straight away; matches when someone reaches a hundred.
         </p>
       )}
+
+      {stats.rating && <RatingBlock rating={stats.rating} />}
 
       <div className="stats-columns">
         <TallyBlock title="Against people" tally={stats.online} rounds={stats.onlineRounds} />
@@ -66,6 +70,42 @@ export default function StatsPanel({ stats }: { stats: Stats }) {
 
       <Trend rounds={stats.onlineRounds} solo={stats.soloRounds} />
     </div>
+  );
+}
+
+/**
+ * The rating, and what it is actually claiming.
+ *
+ * Said plainly under the number: it is relative to the people you play with,
+ * and while provisional it is still finding its level. A rating presented
+ * without either caveat invites more weight than it can carry.
+ */
+function RatingBlock({ rating }: { rating: Rating }) {
+  const moved = rating.lastChange;
+  const direction = moved > 0.0005 ? "up" : moved < -0.0005 ? "down" : "flat";
+
+  return (
+    <section className="stats-block rating-block">
+      <h3>Rating</h3>
+      <p className="rating-value">
+        <strong>{formatRating(rating.rating)}</strong>
+        {rating.provisional && <span className="rating-flag">provisional</span>}
+        {direction !== "flat" && (
+          <span className={`rating-move ${direction}`}>
+            {moved > 0 ? "+" : "−"}
+            {Math.abs(moved).toFixed(3)}
+          </span>
+        )}
+      </p>
+      <p className="stats-note">
+        {rating.provisional
+          ? `Still settling — ${rating.matches} of ${PROVISIONAL_UNTIL} matches, and it moves in bigger steps until then.`
+          : `From ${rating.matches} matches against people.`}{" "}
+        Margin counts, so a close loss to a stronger pair can raise it and a
+        narrow win as favourites can lower it. It only means something next to
+        the people you play with.
+      </p>
+    </section>
   );
 }
 
