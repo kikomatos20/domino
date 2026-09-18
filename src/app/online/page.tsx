@@ -13,6 +13,16 @@ export default function OnlinePage() {
   const [difficulty, setDifficulty] = useState("medium");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * A table that turned us away because it is already playing.
+   *
+   * You cannot take a seat in a match that has started — but you can stand
+   * behind it, and that offer belongs right here, at the moment of refusal.
+   * Sending someone away with "that game has already started" and leaving them
+   * to discover the watch button on a page they have no reason to visit is how
+   * this was missed.
+   */
+  const [startedWithout, setStartedWithout] = useState<string | null>(null);
 
   const [health, setHealth] = useState<string | null>(null);
 
@@ -27,13 +37,19 @@ export default function OnlinePage() {
 
   const run = async (fn: () => Promise<string>) => {
     setError(null);
+    setStartedWithout(null);
     if (!nickname.trim()) return setError("Pick a nickname first");
     setBusy(true);
     try {
       saveNickname(nickname.trim());
       router.push(`/room/${await fn()}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      const message = e instanceof Error ? e.message : "Something went wrong";
+      setError(message);
+      // The server's own words for it; see joinRoom in server/rooms.ts.
+      if (/already started/i.test(message)) {
+        setStartedWithout(code.trim().toUpperCase());
+      }
       setBusy(false);
     }
   };
@@ -125,6 +141,23 @@ export default function OnlinePage() {
         </section>
 
         {error && <p className="error">{error}</p>}
+
+        {startedWithout && (
+          <section className="panel">
+            <p className="home-sub">
+              You can still watch. You will see the table, the score and the
+              talk — and you can ask a player to show you their hand, which is
+              theirs to refuse.
+            </p>
+            <button
+              className="home-button primary"
+              onClick={() => router.push(`/room/${startedWithout}`)}
+            >
+              Watch table {startedWithout}
+            </button>
+            <p className="home-note">Watching needs an account.</p>
+          </section>
+        )}
       </div>
     </main>
   );

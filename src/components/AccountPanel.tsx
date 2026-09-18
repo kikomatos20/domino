@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import AppMenu from "./AppMenu";
 import {
   AVATAR_COLOURS,
@@ -36,6 +37,19 @@ export default function AccountPanel() {
   const [record, setRecord] = useState<PlayRecord | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
 
+  /**
+   * Where to go once they are in.
+   *
+   * Somebody sent here to sign in so they can watch a table wants to be back
+   * at that table, not looking at their own record. Only in-app paths are
+   * honoured — a `next` that could point anywhere is an open redirect, and
+   * this one arrives in a URL that anybody can write.
+   */
+  const router = useRouter();
+  const params = useSearchParams();
+  const raw = params.get("next");
+  const next = raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : null;
+
   useEffect(() => {
     currentAccount()
       .then(setAccount)
@@ -59,10 +73,12 @@ export default function AccountPanel() {
     setBusy(true);
     setError(null);
     try {
-      const next = mode === "up" ? await signUp(username, password) : await signIn(username, password);
-      setAccount(next);
+      const who =
+        mode === "up" ? await signUp(username, password) : await signIn(username, password);
+      setAccount(who);
       // Never keep the password around once it has done its job.
       setPassword("");
+      if (next) router.push(next);
     } catch (e) {
       setError(e instanceof Error ? e.message : "That did not work");
     } finally {

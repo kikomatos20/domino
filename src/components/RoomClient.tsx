@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { accountsAvailable, currentAccount } from "@/lib/auth";
 import {
   act,
   fetchView,
@@ -32,6 +33,14 @@ export default function RoomClient({ code }: { code: string }) {
   const [fatal, setFatal] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [nickname, setNickname] = useState("");
+  /**
+   * Whether there is an account behind this browser.
+   *
+   * Only used to decide what the watch button should say. Offering "Watch
+   * instead" to someone who will be refused for want of an account is a dead
+   * end; better to send them to sign in and come straight back.
+   */
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const version = useRef(-1);
 
   const misses = useRef(0);
@@ -83,6 +92,11 @@ export default function RoomClient({ code }: { code: string }) {
     setNickname(savedNickname());
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!accountsAvailable()) return setSignedIn(false);
+    currentAccount().then((a) => setSignedIn(Boolean(a)));
+  }, []);
 
   /**
    * Changes arrive over the websocket; this timer only catches what it missed.
@@ -280,12 +294,23 @@ export default function RoomClient({ code }: { code: string }) {
             Always on offer, full table or not. Watching is the whole reason
             somebody turns up to a game they are not in.
           */}
-          <button className="home-button secondary" disabled={busy} onClick={watch}>
-            Watch instead
-          </button>
+          {signedIn === false ? (
+            <Link
+              className="home-button secondary"
+              href={`/account?next=${encodeURIComponent(`/room/${view.code}`)}`}
+            >
+              Sign in to watch
+            </Link>
+          ) : (
+            <button className="home-button secondary" disabled={busy} onClick={watch}>
+              Watch instead
+            </button>
+          )}
           <p className="home-note">
             Watching shows the table and the score. To see somebody&rsquo;s hand you
-            have to ask them, and it is theirs to refuse. Takes an account.
+            have to ask them, and it is theirs to refuse.
+            {signedIn === false &&
+              " It takes an account, so the person deciding knows who they are showing."}
           </p>
 
           {error && <p className="error">{error}</p>}
