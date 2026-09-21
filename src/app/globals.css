@@ -959,108 +959,247 @@ body {
   opacity: 0.6;
 }
 
-.badges {
+/*
+ * Medals.
+ *
+ * One custom property per rung drives the ring, the glyph, the bar and the
+ * ladder, so changing a rung's colour is a single edit rather than five.
+ * Platinum gets a glow as well as a colour — it is several times further than
+ * gold, and should not read as one more shade of the same idea.
+ */
+.rung-none {
+  --rung: #6f8a77;
+}
+.rung-bronze {
+  --rung: #cd7f32;
+}
+.rung-silver {
+  --rung: #cfd6dd;
+}
+.rung-gold {
+  --rung: var(--gold);
+}
+.rung-platinum {
+  --rung: #7fe7e0;
+}
+
+.medal-grid {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+  gap: 10px 4px;
+}
+
+.medal-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 4px 2px;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.medal {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Not yet earned: present, plainly unfinished, still legible. */
+  opacity: 0.4;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.medal.won {
+  opacity: 1;
+}
+
+.medal-cell:hover .medal {
+  transform: scale(1.06);
+}
+
+.medal-track {
+  fill: rgba(0, 0, 0, 0.35);
+  stroke: rgba(255, 255, 255, 0.14);
+  stroke-width: 5;
+}
+
+.medal-arc {
+  fill: none;
+  stroke: var(--rung);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.medal.won .medal-track {
+  fill: color-mix(in srgb, var(--rung) 16%, rgba(0, 0, 0, 0.35));
+}
+
+/* Only the top rung glows, and only once it is actually reached. */
+.medal.won.rung-platinum {
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--rung) 55%, transparent));
+}
+
+.medal-glyph {
+  position: absolute;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.medal-name {
+  font-size: 0.66rem;
+  line-height: 1.2;
+  text-align: center;
+  opacity: 0.85;
+}
+
+.medal-cell .medal-bar {
+  display: block;
+  width: 78%;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.medal-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--rung);
+}
+
+/* ------------------------------------------------ one badge, opened */
+
+.badge-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
   gap: 6px;
 }
 
-.badge {
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  /* Not yet earned: present but plainly unfinished. */
-  opacity: 0.45;
-}
-
-.badge.won {
-  opacity: 1;
-  background: linear-gradient(150deg, rgba(212, 175, 55, 0.2), rgba(0, 0, 0, 0.2));
-  border-color: rgba(212, 175, 55, 0.5);
-}
-
-.badge-name {
-  display: block;
+.badge-back {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: #9fb8a6;
+  font: inherit;
   font-size: 0.8rem;
-  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
 }
 
-.badge.won .badge-name {
-  color: var(--gold);
-}
-
-/*
- * Rungs.
- *
- * One custom property per badge drives the name, the border, the wash and the
- * pips, so a rung is a single change rather than four. Platinum gets a glow as
- * well as a colour — it is several times further than gold, and should not
- * look like one more shade of the same idea.
- */
-.badge.rung-bronze {
-  --rung: #cd7f32;
-}
-.badge.rung-silver {
-  --rung: #cfd6dd;
-}
-.badge.rung-gold {
-  --rung: var(--gold);
-}
-.badge.rung-platinum {
-  --rung: #7fe7e0;
-}
-
-.badge.won.rung-bronze,
-.badge.won.rung-silver,
-.badge.won.rung-gold,
-.badge.won.rung-platinum {
-  background: linear-gradient(150deg, color-mix(in srgb, var(--rung) 22%, transparent), rgba(0, 0, 0, 0.2));
-  border-color: color-mix(in srgb, var(--rung) 55%, transparent);
-}
-
-.badge.won.rung-bronze .badge-name,
-.badge.won.rung-silver .badge-name,
-.badge.won.rung-gold .badge-name,
-.badge.won.rung-platinum .badge-name {
+.badge-detail h4 {
+  margin: 4px 0 0;
+  font-size: 1.15rem;
   color: var(--rung);
 }
 
-.badge.won.rung-platinum {
-  border-color: var(--rung);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--rung) 30%, transparent) inset,
-    0 0 14px color-mix(in srgb, var(--rung) 25%, transparent);
+.badge-detail-note {
+  margin: 0;
+  max-width: 26rem;
+  font-size: 0.85rem;
+  color: #cfe3d4;
 }
 
-.badge-rungs {
-  display: inline-flex;
-  gap: 3px;
-  margin-left: 6px;
-  vertical-align: middle;
+.badge-ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  margin: 6px 0;
 }
 
-.badge-rungs i {
-  width: 5px;
-  height: 5px;
+.badge-ring svg {
+  position: absolute;
+  inset: 0;
+}
+
+.medal-track.big {
+  fill: none;
+  stroke-width: 12;
+}
+
+.medal-arc.big {
+  stroke-width: 12;
+}
+
+.badge-ring-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+
+.badge-ring-glyph {
+  font-size: 1.8rem;
+  opacity: 0.35;
+  margin-bottom: 6px;
+}
+
+.badge-ring-inner b {
+  font-size: 2.6rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--rung);
+}
+
+.badge-ring-inner i {
+  font-style: normal;
+  font-size: 0.95rem;
+  opacity: 0.6;
+}
+
+.badge-ring-mark {
+  font-size: 2rem !important;
+}
+
+/* The ladder: four rungs, with the one you are standing on picked out. */
+.ladder {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 6px 0 2px;
+}
+
+.ladder-step {
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  display: grid;
+  place-items: center;
+  border: 2px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.3);
+  opacity: 0.35;
 }
 
-.badge-rungs i.on {
-  background: var(--rung, var(--gold));
-  border-color: var(--rung, var(--gold));
+.ladder-step i {
+  font-size: 0.85rem;
+  font-style: normal;
 }
 
-.badge-note {
-  display: block;
-  margin-top: 2px;
-  font-size: 0.68rem;
-  opacity: 0.7;
-  line-height: 1.3;
+.ladder-step.on {
+  opacity: 1;
+  border-color: var(--rung);
+  background: color-mix(in srgb, var(--rung) 18%, rgba(0, 0, 0, 0.3));
+}
+
+/* The one you are working toward, marked but not claimed. */
+.ladder-step.next {
+  opacity: 0.6;
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--rung) 45%, transparent);
+}
+
+.badge-detail-status {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  color: #9fb8a6;
 }
 
 /* Matches above, rounds below — same block, two different units. */
