@@ -18,6 +18,7 @@ import {
   nextRound,
 } from "@/engine/engine";
 import { chooseMove } from "@/engine/ai";
+import { secureRandom } from "./secureRandom";
 import { manoAt } from "@/engine/roles";
 import { recordMatch } from "./results";
 import { recordRound } from "./roundStats";
@@ -38,7 +39,7 @@ const SEAT_NAME: Record<Seat, string> = {
 /** No I, O, 0 or 1 — they get misread when people share a code out loud. */
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-export function makeCode(random: () => number = Math.random): string {
+export function makeCode(random: () => number = secureRandom): string {
   let out = "";
   for (let i = 0; i < 6; i++) {
     out += CODE_ALPHABET[Math.floor(random() * CODE_ALPHABET.length)];
@@ -46,7 +47,7 @@ export function makeCode(random: () => number = Math.random): string {
   return out;
 }
 
-export function makeToken(random: () => number = Math.random): string {
+export function makeToken(random: () => number = secureRandom): string {
   return Array.from({ length: 4 }, () =>
     Math.floor(random() * 0xffffffff)
       .toString(36)
@@ -191,7 +192,7 @@ export async function createRoom(
   opts: CreateOptions
 ): Promise<{ room: Room; token: string }> {
   const nickname = cleanNickname(opts.nickname);
-  const random = opts.random ?? Math.random;
+  const random = opts.random ?? secureRandom;
   const token = makeToken(random);
 
   // Codes are short, so collisions are possible; try a few.
@@ -235,7 +236,7 @@ export async function joinRoom(
   store: RoomStore,
   code: string,
   nickname: string,
-  random: () => number = Math.random,
+  random: () => number = secureRandom,
   userId: string | null = null
 ): Promise<{ room: Room; token: string }> {
   const room = await mustGet(store, code);
@@ -295,7 +296,7 @@ export async function watchRoom(
   code: string,
   nickname: string,
   userId: string | null,
-  random: () => number = Math.random
+  random: () => number = secureRandom
 ): Promise<{ room: Room; token: string }> {
   const room = await mustGet(store, code);
   if (!userId) throw new RoomError("Sign in to watch a table", 401);
@@ -773,7 +774,7 @@ export async function startMatch(
   room.status = "playing";
   // A new match asks the question again.
   clearConsents(room);
-  room.game = newMatch(Math.random, room.target, room.maxDoubles ?? null);
+  room.game = newMatch(secureRandom, room.target, room.maxDoubles ?? null);
   say(room, {
     kind: "event",
     seat: null,
@@ -909,7 +910,7 @@ async function dealNextRound(
   room: Room,
   game: GameState
 ): Promise<Room> {
-  room.game = nextRound(game);
+  room.game = nextRound(game, secureRandom);
   // The flags describe the round that just ended, so they go with it.
   for (const p of room.players) p.ready = false;
   say(room, {

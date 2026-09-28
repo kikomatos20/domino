@@ -39,9 +39,9 @@ export default function FeedbackPage() {
     async (withKey: string) => {
       setError(null);
       try {
-        const res = await fetch(
-          `/api/feedback/list?key=${encodeURIComponent(withKey)}&open=${openOnly ? 1 : 0}`
-        );
+        const res = await fetch(`/api/feedback/list?open=${openOnly ? 1 : 0}`, {
+          headers: { "x-feedback-key": withKey },
+        });
         const body = await res.json();
         if (!res.ok) throw new Error(body?.error ?? "Could not load");
         window.localStorage.setItem(KEY_STORE, withKey);
@@ -60,9 +60,9 @@ export default function FeedbackPage() {
   }, [openOnly, key, load]);
 
   const resolve = async (id: string, resolved: boolean) => {
-    await fetch(`/api/feedback/list?key=${encodeURIComponent(key)}`, {
+    await fetch(`/api/feedback/list`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "x-feedback-key": key },
       body: JSON.stringify({ id, resolved }),
     });
     load(key);

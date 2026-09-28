@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createSupabaseStore, supabaseConfigured } from "@/server/supabaseStore";
 import { fail } from "../../_util";
@@ -14,16 +15,19 @@ export const dynamic = "force-dynamic";
 function authorised(request: Request): boolean {
   const expected = process.env.FEEDBACK_KEY;
   if (!expected) return false;
-  const url = new URL(request.url);
-  const given = url.searchParams.get("key") ?? request.headers.get("x-feedback-key");
-  return given === expected;
+  // Header only: a key in the query string ends up in request logs.
+  const given = request.headers.get("x-feedback-key");
+  if (!given) return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 export async function GET(request: Request) {
   try {
     if (!authorised(request)) {
       return NextResponse.json(
-        { error: "Set FEEDBACK_KEY and pass ?key=… to read feedback" },
+        { error: "Set FEEDBACK_KEY and send it in the x-feedback-key header" },
         { status: 401 }
       );
     }
