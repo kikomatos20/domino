@@ -14,6 +14,10 @@ interface Item {
   context: { about?: string; payload?: unknown; screen?: unknown; userAgent?: string } | null;
   app_version: string | null;
   resolved: boolean;
+  /** open | fixed | duplicate | wontfix | not_actionable — see supabase/009. */
+  status?: string;
+  fixed_in?: string | null;
+  resolution?: string | null;
 }
 
 const KEY_STORE = "domino:feedbackKey";
@@ -110,10 +114,19 @@ export default function FeedbackPage() {
                 {item.room_code ? ` · ${item.room_code}` : ""}
               </span>
               <span className="when">{new Date(item.created_at).toLocaleString()}</span>
+              {item.status && item.status !== "open" && (
+                <span className="kind">{item.status.replace("_", " ")}</span>
+              )}
             </div>
 
             {item.context?.about && <p className="feedback-about">{item.context.about}</p>}
             <p className="feedback-message">{item.message}</p>
+            {(item.resolution || item.fixed_in) && (
+              <p className="feedback-resolution">
+                {item.resolution}
+                {item.fixed_in ? ` (${item.fixed_in})` : ""}
+              </p>
+            )}
 
             <div className="feedback-actions">
               <button

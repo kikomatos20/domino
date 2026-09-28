@@ -59,3 +59,30 @@ Fix the rule until it passes, and the bug cannot come back.
 Message, optional good/mixed/bad rating, nickname, room code, mode, the position
 payload, screen size, user agent, and the deployed commit. No email addresses,
 no accounts — there aren't any yet.
+
+## Tracking what happened to a report
+
+`supabase/009_feedback_tracking.sql` adds four columns:
+
+| Column | Meaning |
+| --- | --- |
+| `status` | `open`, `fixed`, `duplicate`, `wontfix` or `not_actionable` |
+| `fixed_in` | commit that shipped the fix |
+| `resolution` | one line: what changed, or why nothing will |
+| `resolved_at` | set automatically when a report leaves `open` |
+
+`resolved` stays in step with `status` through a trigger, so **Mark done** on
+`/feedback` still works (it records `fixed`). For anything else, set the status
+in Supabase:
+
+```sql
+update feedback set status = 'fixed', fixed_in = '<sha>', resolution = '<what changed>'
+where id = '<id>';
+```
+
+A report is only closed when the code proves it: name the commit. A fix you
+believe landed but have not seen in play stays `open` with a resolution
+starting `VERIFY:`.
+
+Before quoting feedback anywhere, read `where status = 'open'` — the closed
+rows are history, not a to-do list.
