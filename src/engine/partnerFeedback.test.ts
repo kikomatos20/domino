@@ -91,11 +91,11 @@ const medium = simulate("medium", ROUNDS);
 const pct = (a: number, b: number) => (100 * a) / b;
 
 describe("feedback: 'the computer is now always playing for la tranca' (Kiko, hard)", () => {
-  it.fails("hard does not block noticeably more often than medium", () => {
+  it("hard does not block noticeably more often than medium", () => {
     expect(pct(hard.blocked, ROUNDS)).toBeLessThanOrEqual(pct(medium.blocked, ROUNDS) + 2);
   });
 
-  it.fails("a close hard chooses to make, it wins at least 9 times in 10", () => {
+  it("a close hard chooses to make, it wins at least 9 times in 10", () => {
     // "La tranca es una jugada que no se debe hacer para perderla."
     expect(pct(hard.voluntaryClosesWon, hard.voluntaryCloses)).toBeGreaterThanOrEqual(90);
   });
