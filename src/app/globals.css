@@ -2343,6 +2343,14 @@ body {
   transition: transform 0.12s ease;
 }
 
+/* Any tile in your hand can be picked up to rearrange it, playable or not and
+   on your turn or not, so none of them may hand the gesture to the browser as
+   a scroll — otherwise a phone cancels the drag before it starts. */
+.hand .tile {
+  cursor: grab;
+  touch-action: none;
+}
+
 .tile.grabbable:hover {
   transform: translateY(-6px);
 }
