@@ -368,9 +368,14 @@ export function scoreMoves(
       // La tranca. Not a hunch: count first, then decide whether to shut it.
       const margin = blockedMargin(state, seat, k, weightOf(move.tileId));
       const stake = 26 * conviction;
-      score += margin > 0 ? stake : -stake;
+      // The margin is an estimate, not a count of the hidden hands. Hard only
+      // shuts it when the cushion covers that guess; a close call is a cost,
+      // not a win.
+      const cushion = hard ? 6 : 0;
+      const winning = margin > cushion;
+      score += winning ? stake : -stake;
       reasons.push(
-        margin > 0
+        winning
           ? `Shuts the game (tranca) with your side about ${Math.round(margin)} pips lighter`
           : `Would shut the game with your side about ${Math.round(-margin)} pips heavier — "la tranca es una jugada que no se debe hacer para perderla"`
       );
