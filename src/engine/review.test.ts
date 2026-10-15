@@ -633,3 +633,40 @@ describe("reviewRound", () => {
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
 });
+
+// Feedback 18c62fca (Babo): "Playing the 2/3 guaranteed me the win since i had
+// the rest of the zeroes" — graded only "sound". The position from that report.
+describe("a move that forces the win", () => {
+  const before = snap({
+    line: [
+      { left: 0, seat: 1, right: 3 }, { left: 3, seat: 0, right: 6 }, { left: 6, seat: 1, right: 5 },
+      { left: 5, seat: 3, right: 1 }, { left: 1, seat: 1, right: 6 },
+      { left: 6, seat: 0, right: 6, opening: true },
+      { left: 6, seat: 2, right: 4 }, { left: 4, seat: 0, right: 0 }, { left: 0, seat: 3, right: 5 },
+      { left: 5, seat: 2, right: 4 }, { left: 4, seat: 3, right: 2 }, { left: 2, seat: 0, right: 0 },
+      { left: 0, seat: 1, right: 6 }, { left: 6, seat: 3, right: 2 },
+    ],
+    leftEnd: 0,
+    rightEnd: 2,
+    hands: [
+      ["0-1", "0-0", "2-3"],
+      ["1-3", "4-4", "3-3"],
+      ["3-4", "3-5", "2-2", "1-1", "1-2"],
+      ["5-5", "1-4", "2-5"],
+    ],
+    passedOn: [[], [], [6, 0], []],
+  });
+  const review = (tileId: string, end: "left" | "right") =>
+    reviewRound([{ seat: 0, kind: "play", move: { tileId, end }, before }], 0).moves[0];
+
+  it("grades the 2-3 that locks the round as great", () => {
+    const m = review("2-3", "right");
+    expect(m.verdict).toBe("great");
+    expect(m.principles.some((p) => p.text.startsWith("This made the round yours"))).toBe(true);
+  });
+
+  it("does not credit the 0-0, which leaves the round open", () => {
+    const m = review("0-0", "left");
+    expect(m.principles.some((p) => p.text.startsWith("This made the round yours"))).toBe(false);
+  });
+});
