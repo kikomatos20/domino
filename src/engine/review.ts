@@ -19,10 +19,12 @@
 
 import {
   applyMove,
+  applyPass,
   handPips,
   isCapicua,
   isDouble,
   legalMoves,
+  mustPass,
   parseTile,
   stateFromSnapshot,
   teamOf,
@@ -164,6 +166,47 @@ function outcomeKey(state: GameState, move: Move): string {
 
 function distinctOutcomes(state: GameState, moves: Move[]): number {
   return new Set(moves.map((m) => outcomeKey(state, m))).size;
+}
+
+/** Tiles left in your hand at or under which the review looks for a forced win. */
+const FORCED_WIN_TILES = 3;
+/** Positions searched before giving up — the review must stay instant. */
+const FORCED_WIN_BUDGET = 20000;
+
+/**
+ * Does this position win the round for your team whatever anyone else plays?
+ *
+ * The review sees every hand, so near the end of a round it can settle the
+ * question exactly: you pick your best reply at each turn, the other three —
+ * partner included, to be safe — pick the worst for you. A domino by your team,
+ * or a close your team wins on the count, is a win. Returns false when the
+ * search runs out of budget rather than guessing.
+ */
+function guaranteesWin(state: GameState, seat: Seat): boolean {
+  const team = teamOf(seat);
+  let budget = FORCED_WIN_BUDGET;
+  const search = (s: GameState): boolean | null => {
+    if (budget-- <= 0) return null;
+    if (s.roundOver) return s.roundOver.winningTeam === team;
+    const turn = s.currentSeat;
+    if (mustPass(s, turn)) return search(applyPass(s, turn));
+    const replies = legalMoves(s, turn);
+    if (turn === seat) {
+      let unknown = false;
+      for (const m of replies) {
+        const r = search(applyMove(s, turn, m));
+        if (r === true) return true;
+        if (r === null) unknown = true;
+      }
+      return unknown ? null : false;
+    }
+    for (const m of replies) {
+      const r = search(applyMove(s, turn, m));
+      if (r !== true) return r;
+    }
+    return true;
+  };
+  return search(state) === true;
 }
 
 function pipsOnTable(line: PlacedTile[]): number {
@@ -692,8 +735,26 @@ export function reviewRound(history: MoveRecord[], seat: Seat): RoundReview {
       };
     }
 
+    // A move that makes the round certain — and that the other options did not
+    // — is the best move on the table, whatever the heuristics say about it.
+    let forcedWin = false;
+    if (!opening && outcomes > 1 && remaining.length <= FORCED_WIN_TILES) {
+      const wins = (m: Move) => guaranteesWin(applyMove(state, seat, m), seat);
+      if (wins(played) && options.some((m) => !wins(m))) {
+        forcedWin = true;
+        solo(
+          {
+            kind: "plus",
+            text: "This made the round yours: whatever anyone played after it, your team won.",
+          },
+          3
+        );
+      }
+    }
+
     let verdict: Verdict;
-    if (credit >= 2) verdict = "great";
+    if (forcedWin) verdict = "great";
+    else if (credit >= 2) verdict = "great";
     else if (credit >= -1) verdict = "good";
     else if (credit === -2) verdict = "inaccuracy";
     else verdict = "mistake";
