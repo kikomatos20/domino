@@ -421,6 +421,28 @@ export function scoreMoves(
       );
     }
 
+    /*
+     * Leave the salida alone. As the tercera your job is to keep the mano
+     * playing, and the suit they opened is the one they told you they hold.
+     * Covering it — when another play exists — takes their own suit off the
+     * table. The round review grades a human on the same doctrine.
+     */
+    const salida = state.line.find((t) => t.opening);
+    const coversSalida = (m: Move) => {
+      const end = m.end === "left" ? state.leftEnd : state.rightEnd;
+      return salida !== undefined && (end === salida.left || end === salida.right);
+    };
+    if (
+      role === "tercera" &&
+      matched !== null &&
+      !k.voids[mano].has(matched) &&
+      coversSalida(move) &&
+      moves.some((m) => !coversSalida(m))
+    ) {
+      score -= 3;
+      reasons.push(`Covers the ${matched} your partner opened with — leave their salida for them`);
+    }
+
     if (exposed !== null) {
       // Squeeze opponents onto suits they have already failed on.
       for (const o of opponents) {
