@@ -102,7 +102,7 @@ describe("feedback: 'the computer is now always playing for la tranca' (Kiko, ha
 });
 
 describe("feedback: 'mi frente ... le pega a mi salida todas las rondas' (Babo, hard)", () => {
-  it.fails("the tercera leaves the opener's suit alone when it has another play", () => {
+  it("the tercera leaves the opener's suit alone when it has another play", () => {
     // Doctrine the round review already grades humans on: as the tercera,
     // follow your partner's opening suit rather than covering it.
     expect(pct(hard.terceraCoveredSalida, hard.terceraChoices)).toBeLessThanOrEqual(15);
