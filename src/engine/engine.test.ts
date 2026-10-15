@@ -125,6 +125,18 @@ describe("moves", () => {
     }
   });
 
+  // Feedback 00a5ea4b: "it should automatically place it on the right of the
+  // domino since i was second player". Both ends were 6, so the side made no
+  // difference, yet the tile asked which end.
+  it("offers one end, the right, when both ends show the same number", () => {
+    const s0 = newMatch(seededRng(3));
+    const s1 = applyMove(s0, s0.opener, { tileId: "6-6", end: "right" });
+    const moves = legalMoves(s1, s1.currentSeat);
+    expect(moves.length).toBeGreaterThan(0);
+    expect(moves.every((m) => m.end === "right")).toBe(true);
+    expect(new Set(moves.map((m) => m.tileId)).size).toBe(moves.length);
+  });
+
   it("rejects illegal moves", () => {
     const s0 = newMatch(seededRng(4));
     const other = ((s0.opener + 1) % 4) as Seat;

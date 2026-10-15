@@ -250,10 +250,14 @@ export function legalMoves(state: GameState, seat: Seat): Move[] {
     return hand.map((tileId) => ({ tileId, end: "right" as End }));
   }
 
+  // With both ends showing the same number, left and right leave the identical
+  // position, so offer only the right: the tile plays on a tap instead of asking
+  // which end, and lands where the second player expects it.
+  const sameEnds = state.leftEnd === state.rightEnd;
   const moves: Move[] = [];
   for (const id of hand) {
     const { a, b } = parseTile(id);
-    if (a === state.leftEnd || b === state.leftEnd) moves.push({ tileId: id, end: "left" });
+    if (!sameEnds && (a === state.leftEnd || b === state.leftEnd)) moves.push({ tileId: id, end: "left" });
     if (a === state.rightEnd || b === state.rightEnd) moves.push({ tileId: id, end: "right" });
   }
   return moves;
