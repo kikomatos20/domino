@@ -7,6 +7,13 @@ import DominoTile from "./DominoTile";
 import ZoomedTile, { HOLD_MS } from "./ZoomedTile";
 import type { EndAnchors } from "./Board";
 import { resolveDrop, type Rect } from "./dropTarget";
+import { moveTile, reconcileOrder, slotAt } from "./handOrder";
+
+/** Over the row of tiles itself, give or take a little slack above and below. */
+function inHandRow(row: HTMLElement, x: number, y: number): boolean {
+  const r = row.getBoundingClientRect();
+  return x >= r.left - 20 && x <= r.right + 20 && y >= r.top - 24 && y <= r.bottom + 24;
+}
 
 /** Movement before a press becomes a drag rather than a tap. */
 const DRAG_THRESHOLD = 6;
@@ -25,6 +32,9 @@ interface Drag {
  * Dragging is the natural gesture for dominoes: pick a tile up, slide it to the
  * end you want. Tapping still works — if a tile fits both ends, tapping lifts it
  * so you can then choose an end, rather than guessing for you.
+ *
+ * Dropping a tile back among your own tiles puts it in that slot, so you can
+ * arrange your hand however you like to read it — on your turn or not.
  */
 export default function PlayableHand({
   tiles,
@@ -44,6 +54,8 @@ export default function PlayableHand({
   const [drag, setDrag] = useState<Drag | null>(null);
   const [armed, setArmed] = useState<TileId | null>(null);
   const [zoomed, setZoomed] = useState<TileId | null>(null);
+  const [order, setOrder] = useState<TileId[]>(tiles);
+  const shown = useMemo(() => reconcileOrder(order, tiles), [order, tiles]);
   const start = useRef<{ x: number; y: number } | null>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Dropping back here means "never mind", so we need to know where it is. */
@@ -136,15 +148,23 @@ export default function PlayableHand({
       if (dropped) {
         setArmed(null);
         onPlay(drag.tileId, dropped);
-      } else if (!drag.moved) {
+      } else if (drag.moved) {
+        // Let go over your own tiles: it goes in that slot. Anywhere else that
+        // is not an end is still just "never mind".
+        const row = handRef.current;
+        if (row && inHandRow(row, e.clientX, e.clientY)) {
+          const others = Array.from(row.children)
+            .filter((_, i) => shown[i] !== drag.tileId)
+            .map((el) => el.getBoundingClientRect());
+          setOrder(moveTile(shown, drag.tileId, slotAt(e.clientX, e.clientY, others)));
+        }
+      } else if (options.length === 1) {
         // A tap: play it if there is only one way, otherwise arm it so the ends
         // light up and the next tap picks one.
-        if (options.length === 1) {
-          setArmed(null);
-          onPlay(drag.tileId, options[0].end);
-        } else {
-          setArmed((a) => (a === drag.tileId ? null : drag.tileId));
-        }
+        setArmed(null);
+        onPlay(drag.tileId, options[0].end);
+      } else if (options.length > 1) {
+        setArmed((a) => (a === drag.tileId ? null : drag.tileId));
       }
       setDrag(null);
       start.current = null;
@@ -158,7 +178,7 @@ export default function PlayableHand({
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
     };
-  }, [drag, endUnder, movesFor, onPlay, cancelHold]);
+  }, [drag, endUnder, movesFor, onPlay, cancelHold, shown]);
 
   useEffect(() => cancelHold, [cancelHold]);
 
@@ -201,7 +221,7 @@ export default function PlayableHand({
   return (
     <>
       <div ref={handRef} className={`hand ${disabled ? "sending" : ""}`}>
-        {tiles.map((id) => {
+        {shown.map((id) => {
           const { a, b } = parseTile(id);
           const usable = canPlay(id);
           const isActive = active === id;
@@ -225,30 +245,11 @@ export default function PlayableHand({
                   setZoomed(id);
                 }, HOLD_MS);
 
-                if (usable) {
-                  start.current = { x: e.clientX, y: e.clientY };
-                  setDrag({ tileId: id, x: e.clientX, y: e.clientY, moved: false });
-                }
+                // Every tile can be picked up to rearrange; only playable ones
+                // can land on an end.
+                start.current = { x: e.clientX, y: e.clientY };
+                setDrag({ tileId: id, x: e.clientX, y: e.clientY, moved: false });
               }}
-              onPointerUp={
-                // Tiles you cannot play have no drag, so end the hold here.
-                usable
-                  ? undefined
-                  : () => {
-                      cancelHold();
-                      held.current = false;
-                      setZoomed(null);
-                    }
-              }
-              onPointerCancel={
-                usable
-                  ? undefined
-                  : () => {
-                      cancelHold();
-                      held.current = false;
-                      setZoomed(null);
-                    }
-              }
             />
           );
         })}
