@@ -5,7 +5,7 @@ import type { LastAction, PlacedTile, Seat } from "@/engine/types";
 import DominoTile from "./DominoTile";
 import ZoomedTile, { HOLD_MS } from "./ZoomedTile";
 import { MIN_TABLE, TILE_LONG, TILE_SHORT, layoutLine } from "./lineLayout";
-import { flyFrom, takeDrop } from "./dragMotion";
+import { flyFrom, landingStart, takeDrop } from "./dragMotion";
 
 /** Where each open end of the chain sits on screen, for dropping tiles onto. */
 export interface EndAnchors {
@@ -95,6 +95,15 @@ export default function Board({
     const slot = el?.parentElement;
     if (!drop || !el || !slot) return;
     const [fx, fy] = flyFrom(drop, slot.getBoundingClientRect(), scale);
+    const it = items.find((i) => i.idx === lastIdx);
+    if (it) {
+      // Same size and the same way round as the ghost, so nothing jumps.
+      const first = it.reversed ? it.p.right : it.p.left;
+      const long = Math.max(el.offsetWidth, el.offsetHeight);
+      const start = landingStart(drop, { vertical: it.vertical, first, long }, scale);
+      el.style.setProperty("--fs", `${start.scale}`);
+      el.style.setProperty("--fr", `${start.rotate}deg`);
+    }
     el.style.setProperty("--fx", fx);
     el.style.setProperty("--fy", fy);
     el.style.setProperty("--fo", "1");

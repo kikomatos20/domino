@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_TILT, flyFrom, rememberDrop, takeDrop, tiltFor } from "./dragMotion";
+import { MAX_TILT, flyFrom, landingStart, rememberDrop, takeDrop, tiltFor } from "./dragMotion";
 
 // Feedback f26ab57b (Kiko, in person): dragging should feel like RDomino. The
 // tile leans with the motion, and a played tile glides on from where you let
@@ -29,13 +29,29 @@ describe("landing a played tile from your finger", () => {
     expect(flyFrom({ x: 120, y: 210 }, slot, 1)).toEqual(["0px", "0px"]);
   });
 
-  it("hands the drop point over once, for that tile, while it is fresh", () => {
-    rememberDrop("3-4", 50, 60, 1000);
+  it("hands the drop pose over once, for that tile, while it is fresh", () => {
+    const pose = { x: 50, y: 60, angle: -6, height: 91, top: 3 };
+    rememberDrop("3-4", pose, 1000);
     expect(takeDrop("2-2", 1100)).toBeNull();
-    expect(takeDrop("3-4", 1200)).toEqual({ x: 50, y: 60 });
+    expect(takeDrop("3-4", 1200)).toEqual(pose);
     expect(takeDrop("3-4", 1300)).toBeNull();
 
-    rememberDrop("5-5", 1, 2, 1000);
+    rememberDrop("5-5", { ...pose, top: 5 }, 1000);
     expect(takeDrop("5-5", 1000 + 60_000)).toBeNull();
+  });
+
+  // Kiko on PR 9: the landing has to start at the ghost's size and angle, or
+  // letting go pops.
+  it("starts the landing as big as the ghost and turned the way it was held", () => {
+    // Ghost 91px long on screen; table tile 56 units long drawn at half size = 28px.
+    const ghost = { x: 0, y: 0, angle: -6, height: 91, top: 3 };
+    const upright = landingStart(ghost, { vertical: true, first: 3, long: 56 }, 0.5);
+    expect(upright.scale).toBeCloseTo(91 / 28);
+    expect(upright.rotate).toBe(-6);
+    // Upright but the other way up: half a turn round.
+    expect(landingStart(ghost, { vertical: true, first: 4, long: 56 }, 0.5).rotate).toBe(174);
+    // Flat with the 3 on the left: a quarter turn clockwise brings it on top.
+    expect(landingStart(ghost, { vertical: false, first: 3, long: 56 }, 0.5).rotate).toBe(84);
+    expect(landingStart(ghost, { vertical: false, first: 4, long: 56 }, 0.5).rotate).toBe(-96);
   });
 });

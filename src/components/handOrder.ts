@@ -33,3 +33,11 @@ export function moveTile(order: readonly TileId[], tileId: TileId, index: number
 export function slotAt(x: number, y: number, others: readonly Rect[]): number {
   return others.filter((r) => r.bottom < y || (r.top <= y && (r.left + r.right) / 2 < x)).length;
 }
+
+/** Turn `tileId` round, or back again: the tiles you have flipped, after a tap. */
+export function flipTile(flipped: ReadonlySet<TileId>, tileId: TileId): Set<TileId> {
+  const next = new Set(flipped);
+  if (next.has(tileId)) next.delete(tileId);
+  else next.add(tileId);
+  return next;
+}
