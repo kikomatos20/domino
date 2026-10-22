@@ -22,6 +22,7 @@ import DominoTile from "./DominoTile";
 import FeedbackButton from "./FeedbackButton";
 import PlayableHand from "./PlayableHand";
 import ReviewPanel from "./ReviewPanel";
+import RoundOverlay from "./RoundOverlay";
 import Board from "./Board";
 import type { EndAnchors } from "./Board";
 import AppMenu from "./AppMenu";
@@ -360,60 +361,58 @@ export default function Game() {
 
       {/* Round / match end */}
       {state.roundOver && !reviewing && !showCapicua && (
-        <div className="overlay">
-          <div className="dialog">
-            {state.matchOver ? (
-              <>
-                <h2>{winner === 0 ? "Your team wins the match! 🏆" : "East & West win the match"}</h2>
-                <p className="final">
-                  {state.matchScore[0]} — {state.matchScore[1]}
+        <RoundOverlay key={state.roundNumber}>
+          {state.matchOver ? (
+            <>
+              <h2>{winner === 0 ? "Your team wins the match! 🏆" : "East & West win the match"}</h2>
+              <p className="final">
+                {state.matchScore[0]} — {state.matchScore[1]}
+              </p>
+              <button className="secondary" onClick={() => setReviewing(true)}>
+                Review your play
+              </button>
+              <button
+                onClick={() => {
+                  // A fresh match is a fresh slate for the reporting guards.
+                  reported.current = false;
+                  reportedRound.current = null;
+                  setCapicuaRound(null);
+                  setState(newMatch(Math.random, TARGET_SCORE, maxDoubles));
+                }}
+              >
+                New match
+              </button>
+              <a className="home-button secondary" href="/">
+                Home
+              </a>
+            </>
+          ) : (
+            <>
+              <h2>
+                {state.roundOver.kind === "domino" &&
+                  `${SEAT_NAMES[state.roundOver.winnerSeat!]} dominoed!`}
+                {state.roundOver.kind === "blocked" && "Game blocked (tranca)"}
+                {state.roundOver.kind === "tie" && "Blocked — dead tie, no points"}
+              </h2>
+              {state.roundOver.winningTeam !== null && (
+                <p>
+                  {state.roundOver.winningTeam === 0 ? "Your team" : "East & West"} score{" "}
+                  <strong>{state.roundOver.points}</strong> points
                 </p>
-                <button className="secondary" onClick={() => setReviewing(true)}>
-                  Review your play
-                </button>
-                <button
-                  onClick={() => {
-                    // A fresh match is a fresh slate for the reporting guards.
-                    reported.current = false;
-                    reportedRound.current = null;
-                    setCapicuaRound(null);
-                    setState(newMatch(Math.random, TARGET_SCORE, maxDoubles));
-                  }}
-                >
-                  New match
-                </button>
-                <a className="home-button secondary" href="/">
-                  Home
-                </a>
-              </>
-            ) : (
-              <>
-                <h2>
-                  {state.roundOver.kind === "domino" &&
-                    `${SEAT_NAMES[state.roundOver.winnerSeat!]} dominoed!`}
-                  {state.roundOver.kind === "blocked" && "Game blocked (tranca)"}
-                  {state.roundOver.kind === "tie" && "Blocked — dead tie, no points"}
-                </h2>
-                {state.roundOver.winningTeam !== null && (
-                  <p>
-                    {state.roundOver.winningTeam === 0 ? "Your team" : "East & West"} score{" "}
-                    <strong>{state.roundOver.points}</strong> points
-                  </p>
-                )}
-                <p className="pips-detail">
-                  Pips left — You: {state.roundOver.pips[0]}, East: {state.roundOver.pips[1]},
-                  Partner: {state.roundOver.pips[2]}, West: {state.roundOver.pips[3]}
-                </p>
-                <button className="secondary" onClick={() => setReviewing(true)}>
-                  Review your play
-                </button>
-                <button onClick={() => setState((s) => (s ? nextRound(s) : s))}>
-                  Next round
-                </button>
-              </>
-            )}
-          </div>
-        </div>
+              )}
+              <p className="pips-detail">
+                Pips left — You: {state.roundOver.pips[0]}, East: {state.roundOver.pips[1]},
+                Partner: {state.roundOver.pips[2]}, West: {state.roundOver.pips[3]}
+              </p>
+              <button className="secondary" onClick={() => setReviewing(true)}>
+                Review your play
+              </button>
+              <button onClick={() => setState((s) => (s ? nextRound(s) : s))}>
+                Next round
+              </button>
+            </>
+          )}
+        </RoundOverlay>
       )}
 
       {reviewing && (
