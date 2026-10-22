@@ -7,7 +7,7 @@ import DominoTile from "./DominoTile";
 import ZoomedTile, { HOLD_MS } from "./ZoomedTile";
 import type { EndAnchors } from "./Board";
 import { resolveDrop, type Rect } from "./dropTarget";
-import { moveTile, reconcileOrder, slotAt } from "./handOrder";
+import { flipTile, moveTile, reconcileOrder, slotAt } from "./handOrder";
 import {
   GHOST_LEAN,
   GHOST_SCALE,
@@ -49,8 +49,9 @@ interface Drag {
  * Your tiles, playable by dragging onto either end of the chain.
  *
  * Dragging is the natural gesture for dominoes: pick a tile up, slide it to the
- * end you want. Tapping still works — if a tile fits both ends, tapping lifts it
- * so you can then choose an end, rather than guessing for you.
+ * end you want; the ends it fits light up while you hold it. Tapping a tile
+ * only turns it round, so you can read it whichever way up you like. Playing
+ * is always a drag.
  *
  * Dropping a tile back among your own tiles puts it in that slot, so you can
  * arrange your hand however you like to read it — on your turn or not. While
@@ -73,10 +74,13 @@ export default function PlayableHand({
   onPlay: (tileId: TileId, end: End) => void;
 }) {
   const [drag, setDrag] = useState<Drag | null>(null);
-  const [armed, setArmed] = useState<TileId | null>(null);
   const [zoomed, setZoomed] = useState<TileId | null>(null);
   const [order, setOrder] = useState<TileId[]>(tiles);
   const shown = useMemo(() => reconcileOrder(order, tiles), [order, tiles]);
+  /** Tiles you have turned round. Only how they look in your hand, like the order. */
+  const [flipped, setFlipped] = useState<Set<TileId>>(() => new Set());
+  /** The tile just flipped, so it can be seen turning. Bumped on every tap. */
+  const [turning, setTurning] = useState<{ id: TileId; n: number } | null>(null);
   const start = useRef<{ x: number; y: number } | null>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Dropping back here means "never mind", so we need to know where it is. */
@@ -106,7 +110,10 @@ export default function PlayableHand({
     [legalMoves]
   );
 
-  const active = drag?.tileId ?? armed;
+  const canPlay = (id: TileId) => yourTurn && !disabled && playable.has(id);
+
+  // Only a tile on the move lights the ends: a press may still be a tap.
+  const active = drag?.moved ? drag.tileId : null;
   const activeEnds = useMemo(
     () => new Set(active ? movesFor(active).map((m) => m.end) : []),
     [active, movesFor]
@@ -153,7 +160,7 @@ export default function PlayableHand({
       y: y - h * 0.1,
       angle: back ? 0 : GHOST_LEAN + d.tilt,
       height: h * scale,
-      top: parseTile(d.tileId).a,
+      top: face(d.tileId).a,
     };
   };
 
@@ -250,7 +257,6 @@ export default function PlayableHand({
     const up = (e: PointerEvent) => {
       cancelHold();
       if (settleTilt.current) clearTimeout(settleTilt.current);
-      const options = movesFor(drag.tileId);
       const dropped = drag.moved ? endUnder(e.clientX, e.clientY) : null;
 
       // A hold was for a closer look — let go without playing anything.
@@ -263,7 +269,6 @@ export default function PlayableHand({
       }
 
       if (dropped) {
-        setArmed(null);
         rememberDrop(drag.tileId, ghostPose(drag, e.clientX, e.clientY, false));
         onPlay(drag.tileId, dropped);
       } else if (drag.moved) {
@@ -272,13 +277,10 @@ export default function PlayableHand({
         const slot = slotUnder(drag, e.clientX, e.clientY);
         if (slot !== null) setOrder(moveTile(shown, drag.tileId, slot));
         landing.current = { tileId: drag.tileId, pose: ghostPose(drag, e.clientX, e.clientY, true) };
-      } else if (options.length === 1) {
-        // A tap: play it if there is only one way, otherwise arm it so the ends
-        // light up and the next tap picks one.
-        setArmed(null);
-        onPlay(drag.tileId, options[0].end);
-      } else if (options.length > 1) {
-        setArmed((a) => (a === drag.tileId ? null : drag.tileId));
+      } else {
+        // A tap turns the tile round, and that is all it does.
+        setFlipped((f) => flipTile(f, drag.tileId));
+        setTurning((t) => ({ id: drag.tileId, n: (t?.n ?? 0) + 1 }));
       }
       setDrag(null);
       start.current = null;
@@ -292,7 +294,7 @@ export default function PlayableHand({
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
     };
-  }, [drag, endUnder, movesFor, onPlay, cancelHold, shown]);
+  }, [drag, endUnder, onPlay, cancelHold, shown]);
 
   useEffect(
     () => () => {
@@ -302,27 +304,21 @@ export default function PlayableHand({
     [cancelHold]
   );
 
-  // Tapping an end while a tile is armed plays it there.
-  useEffect(() => {
-    if (!armed) return;
-    const click = (e: PointerEvent) => {
-      const end = endUnder(e.clientX, e.clientY);
-      if (end) {
-        onPlay(armed, end);
-        setArmed(null);
-      }
-    };
-    window.addEventListener("pointerdown", click);
-    return () => window.removeEventListener("pointerdown", click);
-  }, [armed, endUnder, onPlay]);
-
-  useEffect(() => {
-    if (!yourTurn) setArmed(null);
-  }, [yourTurn]);
+  // Spin the tile you just tapped half a turn into its new way up. Its halves
+  // have already swapped, so it starts from upside down and comes round.
+  useLayoutEffect(() => {
+    if (!turning) return;
+    const el = handRef.current?.children[laidOut.indexOf(turning.id)] as HTMLElement | undefined;
+    el?.animate?.([{ rotate: "180deg" }, { rotate: "0deg" }], {
+      duration: 240,
+      easing: "cubic-bezier(0.3, 0.9, 0.4, 1)",
+    });
+    // Only a new tap should start it again, not the hand re-rendering.
+  }, [turning]);
 
   // Escape backs out of a tile you have picked up but not committed.
   useEffect(() => {
-    if (!drag && !armed) return;
+    if (!drag) return;
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       cancelHold();
@@ -333,20 +329,23 @@ export default function PlayableHand({
       held.current = false;
       start.current = null;
       setZoomed(null);
-      setArmed(null);
       setDrag(null);
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [drag, armed, cancelHold, endUnder]);
+  }, [drag, cancelHold, endUnder]);
 
-  const canPlay = (id: TileId) => yourTurn && !disabled && playable.has(id);
+  /** The tile's two numbers, top first, the way up you have turned it. */
+  const face = (id: TileId) => {
+    const { a, b } = parseTile(id);
+    return flipped.has(id) ? { a: b, b: a } : { a, b };
+  };
 
   return (
     <>
       <div ref={handRef} className={`hand ${disabled ? "sending" : ""}`}>
         {laidOut.map((id) => {
-          const { a, b } = parseTile(id);
+          const { a, b } = face(id);
           const usable = canPlay(id);
           const isActive = active === id;
           return (
@@ -423,8 +422,8 @@ export default function PlayableHand({
           }
         >
           <DominoTile
-            left={parseTile(drag.tileId).a}
-            right={parseTile(drag.tileId).b}
+            left={face(drag.tileId).a}
+            right={face(drag.tileId).b}
             vertical
             highlight={!returning}
           />

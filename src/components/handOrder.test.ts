@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { moveTile, reconcileOrder, slotAt } from "./handOrder";
+import { flipTile, moveTile, reconcileOrder, slotAt } from "./handOrder";
 import type { Rect } from "./dropTarget";
 
 // Feedback 2978b729 (in person): let players rearrange the tiles in their hand
@@ -30,5 +30,16 @@ describe("arranging your own hand", () => {
     expect(slotAt(200, 640, wrapped)).toBe(2);
     expect(slotAt(30, 720, wrapped)).toBe(3);
     expect(slotAt(10, 720, wrapped)).toBe(2);
+  });
+});
+
+// Feedback 53acfa3d (Fico, online): let players turn their tiles round. A tap
+// now only flips a tile; playing is always a drag.
+describe("flipping your own tiles", () => {
+  it("turns a tile round on each tap, without touching the others", () => {
+    const once = flipTile(new Set(), "4-6");
+    expect([...once]).toEqual(["4-6"]);
+    expect([...flipTile(once, "4-6")]).toEqual([]);
+    expect([...flipTile(once, "0-3")].sort()).toEqual(["0-3", "4-6"]);
   });
 });
