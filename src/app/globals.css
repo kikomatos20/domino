@@ -2192,7 +2192,8 @@ body {
 
 @keyframes place-tile {
   0% {
-    transform: translate(var(--fx, 0px), var(--fy, -220px)) scale(1.45) rotate(8deg);
+    /* --fs / --fr: the ghost's own size and angle, when it starts under your finger. */
+    transform: translate(var(--fx, 0px), var(--fy, -220px)) scale(var(--fs, 1.45)) rotate(var(--fr, 8deg));
     /* 1 when it starts under your finger, where you can already see it. */
     opacity: var(--fo, 0);
     box-shadow: 0 26px 40px rgba(0, 0, 0, 0.6);
@@ -2367,11 +2368,12 @@ body {
 }
 
 /* The tile that follows your finger: lifted off the table, leaning a little
-   into the way it is moving (--tilt, set as you drag). */
+   into the way it is moving. The numbers come from PlayableHand (dragMotion.ts),
+   which starts whatever replaces the ghost from the same pose. */
 .drag-ghost {
   position: fixed;
   z-index: 200;
-  transform: translate(-50%, -60%) scale(1.14) rotate(calc(-3deg + var(--tilt, 0deg)));
+  transform: translate(-50%, -60%) scale(var(--lift, 1.14)) rotate(var(--lean, -6deg));
   pointer-events: none;
   filter: drop-shadow(0 14px 20px rgba(0, 0, 0, 0.55));
   transition: transform 120ms ease-out, opacity 90ms ease;
@@ -2379,8 +2381,8 @@ body {
 
 /* Over your own hand — letting go here puts the tile back, so say so. */
 .drag-ghost.returning {
-  transform: translate(-50%, -60%) scale(0.94) rotate(0deg);
-  opacity: 0.55;
+  transform: translate(-50%, -60%) scale(var(--back-scale, 0.94)) rotate(0deg);
+  opacity: var(--back-opacity, 0.55);
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
 }
 
