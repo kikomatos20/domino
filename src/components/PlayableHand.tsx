@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { parseTile } from "@/engine/engine";
 import type { End, Move, TileId } from "@/engine/types";
 import DominoTile from "./DominoTile";
@@ -8,12 +8,15 @@ import ZoomedTile, { HOLD_MS } from "./ZoomedTile";
 import type { EndAnchors } from "./Board";
 import { resolveDrop, type Rect } from "./dropTarget";
 import { moveTile, reconcileOrder, slotAt } from "./handOrder";
+import { rememberDrop, tiltFor } from "./dragMotion";
 
 /** Over the row of tiles itself, give or take a little slack above and below. */
-function inHandRow(row: HTMLElement, x: number, y: number): boolean {
-  const r = row.getBoundingClientRect();
+function inHandRow(r: Rect, x: number, y: number): boolean {
   return x >= r.left - 20 && x <= r.right + 20 && y >= r.top - 24 && y <= r.bottom + 24;
 }
+
+/** How long tiles take to slide into a new place. */
+const SLIDE_MS = 160;
 
 /** Movement before a press becomes a drag rather than a tap. */
 const DRAG_THRESHOLD = 6;
@@ -24,6 +27,14 @@ interface Drag {
   y: number;
   /** Still might be a tap — no ghost until the finger actually moves. */
   moved: boolean;
+  /** How far the held tile leans with the motion, in degrees. */
+  tilt: number;
+  /**
+   * Your hand as it lay when the drag began: the row, and the other tiles in
+   * order. Slots are worked out against this, so the tiles moving apart to
+   * make room do not move the slot from under your finger.
+   */
+  home?: { row: Rect; others: Rect[] };
 }
 
 /**
@@ -34,7 +45,9 @@ interface Drag {
  * so you can then choose an end, rather than guessing for you.
  *
  * Dropping a tile back among your own tiles puts it in that slot, so you can
- * arrange your hand however you like to read it — on your turn or not.
+ * arrange your hand however you like to read it — on your turn or not. While
+ * you hold it over your hand the others slide apart to show where it will go,
+ * and whatever you let go of glides to its place rather than jumping there.
  */
 export default function PlayableHand({
   tiles,
@@ -62,6 +75,12 @@ export default function PlayableHand({
   const handRef = useRef<HTMLDivElement>(null);
   /** Set when a hold magnified the tile, so releasing does not also play it. */
   const held = useRef(false);
+  /** Where each tile sat after the last render, to slide it from there. */
+  const laidAt = useRef(new Map<TileId, { x: number; y: number }>());
+  /** A tile let go of in the hand, and where: it glides home from that point. */
+  const landing = useRef<{ tileId: TileId; x: number; y: number } | null>(null);
+  /** Straightens the held tile up when the finger stops moving. */
+  const settleTilt = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cancelHold = useCallback(() => {
     if (holdTimer.current) clearTimeout(holdTimer.current);
@@ -109,6 +128,53 @@ export default function PlayableHand({
   // Back over your hand: show the tile is coming home rather than being played.
   const returning = Boolean(drag?.moved) && hovered === null;
 
+  /** The slot among your tiles under (x, y), or null if not over your hand. */
+  const slotUnder = (d: Drag, x: number, y: number): number | null =>
+    d.home && inHandRow(d.home.row, x, y) ? slotAt(x, y, d.home.others) : null;
+  // Held over your hand: lay the tiles out as they would be if you let go now.
+  const gap = drag?.moved ? slotUnder(drag, drag.x, drag.y) : null;
+  const laidOut = drag && gap !== null ? moveTile(shown, drag.tileId, gap) : shown;
+
+  // Any tile whose place changed slides there from where it was; a tile just
+  // let go of glides from the drop point. Runs after every render, before paint.
+  useLayoutEffect(() => {
+    const row = handRef.current;
+    if (!row) return;
+    const land = landing.current;
+    landing.current = null;
+    const now = new Map<TileId, { x: number; y: number }>();
+    Array.from(row.children).forEach((child, i) => {
+      const el = child as HTMLElement;
+      const id = laidOut[i];
+      const at = { x: el.offsetLeft, y: el.offsetTop };
+      now.set(id, at);
+      if (!el.animate) return;
+      if (land?.tileId === id) {
+        const r = el.getBoundingClientRect();
+        const dx = land.x - (r.left + r.right) / 2;
+        const dy = land.y - (r.top + r.bottom) / 2;
+        el.getAnimations().forEach((a) => a.cancel());
+        el.animate(
+          [
+            { translate: `${dx}px ${dy}px`, scale: "1.1", rotate: "-3deg" },
+            { translate: "0px 0px", scale: "1", rotate: "0deg" },
+          ],
+          { duration: 220, easing: "cubic-bezier(0.2, 0.8, 0.3, 1)" }
+        );
+        return;
+      }
+      const was = laidAt.current.get(id);
+      if (was && (was.x !== at.x || was.y !== at.y)) {
+        el.getAnimations().forEach((a) => a.cancel());
+        el.animate(
+          [{ translate: `${was.x - at.x}px ${was.y - at.y}px` }, { translate: "0px 0px" }],
+          { duration: SLIDE_MS, easing: "ease-out" }
+        );
+      }
+    });
+    laidAt.current = now;
+  });
+
   // Follow the pointer for the whole gesture, even outside the tile.
   useEffect(() => {
     if (!drag) return;
@@ -128,11 +194,26 @@ export default function PlayableHand({
           setZoomed(null);
         }
       }
-      setDrag((d) => (d ? { ...d, x: e.clientX, y: e.clientY, moved } : d));
+      // The first real movement: note how the hand lay before anything moves.
+      let home = drag.home;
+      if (moved && !home && handRef.current) {
+        const row = handRef.current;
+        home = {
+          row: row.getBoundingClientRect(),
+          others: Array.from(row.children)
+            .filter((_, i) => shown[i] !== drag.tileId)
+            .map((el) => el.getBoundingClientRect()),
+        };
+      }
+      const tilt = moved ? tiltFor(drag.tilt, e.clientX - drag.x) : 0;
+      if (settleTilt.current) clearTimeout(settleTilt.current);
+      settleTilt.current = setTimeout(() => setDrag((d) => (d ? { ...d, tilt: 0 } : d)), 90);
+      setDrag((d) => (d ? { ...d, x: e.clientX, y: e.clientY, moved, tilt, home } : d));
     };
 
     const up = (e: PointerEvent) => {
       cancelHold();
+      if (settleTilt.current) clearTimeout(settleTilt.current);
       const options = movesFor(drag.tileId);
       const dropped = drag.moved ? endUnder(e.clientX, e.clientY) : null;
 
@@ -147,17 +228,14 @@ export default function PlayableHand({
 
       if (dropped) {
         setArmed(null);
+        rememberDrop(drag.tileId, e.clientX, e.clientY);
         onPlay(drag.tileId, dropped);
       } else if (drag.moved) {
         // Let go over your own tiles: it goes in that slot. Anywhere else that
-        // is not an end is still just "never mind".
-        const row = handRef.current;
-        if (row && inHandRow(row, e.clientX, e.clientY)) {
-          const others = Array.from(row.children)
-            .filter((_, i) => shown[i] !== drag.tileId)
-            .map((el) => el.getBoundingClientRect());
-          setOrder(moveTile(shown, drag.tileId, slotAt(e.clientX, e.clientY, others)));
-        }
+        // is not an end is still just "never mind". Either way it glides there.
+        const slot = slotUnder(drag, e.clientX, e.clientY);
+        if (slot !== null) setOrder(moveTile(shown, drag.tileId, slot));
+        landing.current = { tileId: drag.tileId, x: e.clientX, y: e.clientY };
       } else if (options.length === 1) {
         // A tap: play it if there is only one way, otherwise arm it so the ends
         // light up and the next tap picks one.
@@ -180,7 +258,13 @@ export default function PlayableHand({
     };
   }, [drag, endUnder, movesFor, onPlay, cancelHold, shown]);
 
-  useEffect(() => cancelHold, [cancelHold]);
+  useEffect(
+    () => () => {
+      cancelHold();
+      if (settleTilt.current) clearTimeout(settleTilt.current);
+    },
+    [cancelHold]
+  );
 
   // Tapping an end while a tile is armed plays it there.
   useEffect(() => {
@@ -206,6 +290,7 @@ export default function PlayableHand({
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       cancelHold();
+      if (drag?.moved) landing.current = { tileId: drag.tileId, x: drag.x, y: drag.y };
       held.current = false;
       start.current = null;
       setZoomed(null);
@@ -221,7 +306,7 @@ export default function PlayableHand({
   return (
     <>
       <div ref={handRef} className={`hand ${disabled ? "sending" : ""}`}>
-        {shown.map((id) => {
+        {laidOut.map((id) => {
           const { a, b } = parseTile(id);
           const usable = canPlay(id);
           const isActive = active === id;
@@ -248,7 +333,7 @@ export default function PlayableHand({
                 // Every tile can be picked up to rearrange; only playable ones
                 // can land on an end.
                 start.current = { x: e.clientX, y: e.clientY };
-                setDrag({ tileId: id, x: e.clientX, y: e.clientY, moved: false });
+                setDrag({ tileId: id, x: e.clientX, y: e.clientY, moved: false, tilt: 0 });
               }}
             />
           );
@@ -286,7 +371,9 @@ export default function PlayableHand({
       {drag && drag.moved && (
         <div
           className={`drag-ghost ${returning ? "returning" : ""}`}
-          style={{ left: drag.x, top: drag.y }}
+          style={
+            { left: drag.x, top: drag.y, "--tilt": `${drag.tilt}deg` } as React.CSSProperties
+          }
         >
           <DominoTile
             left={parseTile(drag.tileId).a}

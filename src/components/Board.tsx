@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { LastAction, PlacedTile, Seat } from "@/engine/types";
 import DominoTile from "./DominoTile";
 import ZoomedTile, { HOLD_MS } from "./ZoomedTile";
 import { MIN_TABLE, TILE_LONG, TILE_SHORT, layoutLine } from "./lineLayout";
+import { flyFrom, takeDrop } from "./dragMotion";
 
 /** Where each open end of the chain sits on screen, for dropping tiles onto. */
 export interface EndAnchors {
@@ -80,6 +81,28 @@ export default function Board({
     3: ["-220px", "0px"],
   };
   const fromFor = (seat: Seat) => FROM[(seat - viewer + 4) % 4];
+
+  // A tile you dragged on lands from where you let go of it, not from off the
+  // edge: restart its landing from that point before it is first painted.
+  const lastId =
+    lastIdx === null || !line[lastIdx]
+      ? null
+      : `${Math.min(line[lastIdx].left, line[lastIdx].right)}-${Math.max(line[lastIdx].left, line[lastIdx].right)}`;
+  useLayoutEffect(() => {
+    if (!lastId) return;
+    const drop = takeDrop(lastId);
+    const el = tableRef.current?.querySelector<HTMLElement>(".just-played");
+    const slot = el?.parentElement;
+    if (!drop || !el || !slot) return;
+    const [fx, fy] = flyFrom(drop, slot.getBoundingClientRect(), scale);
+    el.style.setProperty("--fx", fx);
+    el.style.setProperty("--fy", fy);
+    el.style.setProperty("--fo", "1");
+    el.style.animation = "none";
+    void el.offsetWidth;
+    el.style.animation = "";
+    // Only a new play should do this, not a resize of the table.
+  }, [lastId, line.length]);
 
   // Tell the hand where the two ends are, in screen coordinates, so a dragged
   // tile can be dropped onto one of them. Recomputed whenever the chain or the
