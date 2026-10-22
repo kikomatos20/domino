@@ -3022,3 +3022,24 @@ body {
     font-size: 0.8rem;
   }
 }
+
+/* ---------- looking at the table after a round ---------- */
+
+/* The round-over dialog stepped aside so you can read everyone's tiles; this
+   brings it back. Small and central, clear of the hands round the edges. */
+.peek-back {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 220;
+  background: var(--felt-dark);
+  color: #fff;
+  border: 1px solid rgba(212, 175, 55, 0.6);
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}

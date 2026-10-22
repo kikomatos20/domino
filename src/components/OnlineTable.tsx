@@ -17,6 +17,7 @@ import FeedbackButton from "./FeedbackButton";
 import type { FeedbackContext } from "./FeedbackForm";
 import PlayableHand from "./PlayableHand";
 import ReviewPanel from "./ReviewPanel";
+import RoundOverlay from "./RoundOverlay";
 import TableChat from "./TableChat";
 import { useFading, useReplay } from "./useReplay";
 
@@ -485,90 +486,88 @@ export default function OnlineTable({
       )}
 
       {game.roundOver && !reviewing && !replay.catchingUp && !showCapicua && (
-        <div className="overlay">
-          <div className="dialog">
-            {game.matchOver ? (
-              <>
-                <h2>
+        <RoundOverlay key={game.roundNumber}>
+          {game.matchOver ? (
+            <>
+              <h2>
+                {watching
+                  ? `${teamName(game.roundOver.winningTeam)} win the match 🏆`
+                  : game.roundOver.winningTeam === yourTeam
+                    ? "Your team wins the match! 🏆"
+                    : "The other team wins the match"}
+              </h2>
+              <p className="final">
+                {usScore} — {themScore}
+              </p>
+              {!watching && (
+                <button className="secondary" onClick={openReview}>
+                  Review your play
+                </button>
+              )}
+
+              {/* Same room, same seats, fresh match — the usual next thing
+                  after a game ends with everyone still sitting there. */}
+              {/* Back to the lobby they already know, with the seats still
+                  theirs to rearrange. Nobody has to share a code again. */}
+              {!watching && (
+                <button disabled={busy} onClick={onLobby}>
+                  Play again — back to the lobby
+                </button>
+              )}
+
+              <a className="home-button secondary" href="/">
+                Home
+              </a>
+            </>
+          ) : (
+            <>
+              <h2>
+                {game.roundOver.kind === "domino" &&
+                  `${seat(game.roundOver.winnerSeat!).isYou ? "You" : seat(game.roundOver.winnerSeat!).label} dominoed!`}
+                {game.roundOver.kind === "blocked" && "Game blocked (tranca)"}
+                {game.roundOver.kind === "tie" && "Blocked — dead tie, no points"}
+              </h2>
+              {game.roundOver.winningTeam !== null && (
+                <p>
                   {watching
-                    ? `${teamName(game.roundOver.winningTeam)} win the match 🏆`
+                    ? teamName(game.roundOver.winningTeam)
                     : game.roundOver.winningTeam === yourTeam
-                      ? "Your team wins the match! 🏆"
-                      : "The other team wins the match"}
-                </h2>
-                <p className="final">
-                  {usScore} — {themScore}
+                      ? "Your team"
+                      : "The other team"}{" "}
+                  scores <strong>{game.roundOver.points}</strong> points
                 </p>
-                {!watching && (
+              )}
+
+              {/* A watcher waits on the players, and holds nothing up. */}
+              {watching ? (
+                <p className="ready-note">Waiting for the players…</p>
+              ) : (
+                <>
                   <button className="secondary" onClick={openReview}>
                     Review your play
                   </button>
-                )}
 
-                {/* Same room, same seats, fresh match — the usual next thing
-                    after a game ends with everyone still sitting there. */}
-                {/* Back to the lobby they already know, with the seats still
-                    theirs to rearrange. Nobody has to share a code again. */}
-                {!watching && (
-                  <button disabled={busy} onClick={onLobby}>
-                    Play again — back to the lobby
+                  {/* Nobody's click starts the next round but everybody's.
+                      Take as long as you like over the review. */}
+                  <button
+                    className={youAreReady ? "secondary" : ""}
+                    disabled={busy}
+                    onClick={() => onReady(!youAreReady)}
+                  >
+                    {youAreReady ? "Wait — not ready" : "Ready for next round"}
                   </button>
-                )}
-
-                <a className="home-button secondary" href="/">
-                  Home
-                </a>
-              </>
-            ) : (
-              <>
-                <h2>
-                  {game.roundOver.kind === "domino" &&
-                    `${seat(game.roundOver.winnerSeat!).isYou ? "You" : seat(game.roundOver.winnerSeat!).label} dominoed!`}
-                  {game.roundOver.kind === "blocked" && "Game blocked (tranca)"}
-                  {game.roundOver.kind === "tie" && "Blocked — dead tie, no points"}
-                </h2>
-                {game.roundOver.winningTeam !== null && (
-                  <p>
-                    {watching
-                      ? teamName(game.roundOver.winningTeam)
-                      : game.roundOver.winningTeam === yourTeam
-                        ? "Your team"
-                        : "The other team"}{" "}
-                    scores <strong>{game.roundOver.points}</strong> points
-                  </p>
-                )}
-
-                {/* A watcher waits on the players, and holds nothing up. */}
-                {watching ? (
-                  <p className="ready-note">Waiting for the players…</p>
-                ) : (
-                  <>
-                    <button className="secondary" onClick={openReview}>
-                      Review your play
-                    </button>
-
-                    {/* Nobody's click starts the next round but everybody's.
-                        Take as long as you like over the review. */}
-                    <button
-                      className={youAreReady ? "secondary" : ""}
-                      disabled={busy}
-                      onClick={() => onReady(!youAreReady)}
-                    >
-                      {youAreReady ? "Wait — not ready" : "Ready for next round"}
-                    </button>
-                  </>
-                )}
-                {!watching && waitingFor.length > 0 && (
-                  <p className="ready-note">
-                    {youAreReady
-                      ? `Waiting for ${waitingFor.join(", ")}`
-                      : `${readyCount} of ${humansAtTable} ready`}
-                  </p>
-                )}
-              </>
-            )}
-          </div>
-        </div>
+                </>
+              )}
+              {!watching && waitingFor.length > 0 && (
+                <p className="ready-note">
+                  {youAreReady
+                    ? `Waiting for ${waitingFor.join(", ")}`
+                    : `${readyCount} of ${humansAtTable} ready`}
+                </p>
+              )}
+            </>
+          )}
+        </RoundOverlay>
       )}
 
       {reviewing && (
