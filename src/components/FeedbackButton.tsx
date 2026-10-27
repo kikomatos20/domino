@@ -13,10 +13,13 @@ export default function FeedbackButton({
   label = "Feedback",
   /** Sit in a toolbar instead of floating, so it cannot cover anything. */
   inline = false,
+  className,
 }: {
   context: () => FeedbackContext;
   label?: string;
   inline?: boolean;
+  /** Overrides the look, e.g. to sit in the menu as one of its rows. */
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [snapshot, setSnapshot] = useState<FeedbackContext | null>(null);
@@ -24,7 +27,7 @@ export default function FeedbackButton({
   return (
     <>
       <button
-        className={inline ? "chat-collapse" : "feedback-fab"}
+        className={className ?? (inline ? "chat-collapse" : "feedback-fab")}
         title="Send feedback"
         onClick={() => {
           // Grab the position as it is right now, before any dialog changes it.
