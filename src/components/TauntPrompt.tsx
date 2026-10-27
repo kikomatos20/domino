@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useModal } from "./useModal";
 
 /** Long enough for a line, short enough to read at a glance. */
 export const MAX_TAUNT = 60;
@@ -20,10 +21,19 @@ export default function TauntPrompt({
   onCancel: () => void;
 }) {
   const [text, setText] = useState("");
+  const boxRef = useRef<HTMLDivElement>(null);
+  useModal(boxRef, onCancel);
 
   return (
     <div className="overlay" onClick={onCancel}>
-      <div className="dialog taunt" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="dialog taunt"
+        ref={boxRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Capicúa"
+        onClick={(e) => e.stopPropagation()}
+      >
         <h2>Capicúa</h2>
         <p className="home-sub">Both ends. Care to say anything?</p>
 

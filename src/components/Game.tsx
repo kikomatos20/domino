@@ -346,7 +346,7 @@ export default function Game() {
           ) : banner ? (
             <span className="banner">{banner}</span>
           ) : humanTurn ? (
-            <span className="turn-hint">Your turn: drag a tile onto an end</span>
+            <span className="turn-hint">Your turn: double-tap a tile to play</span>
           ) : null}
         </div>
         <PlayableHand
