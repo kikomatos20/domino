@@ -3814,3 +3814,98 @@ summary,
   display: inline-block;
   padding: 10px 0;
 }
+
+
+/* ================================================================
+   Menu fixes after phase 2
+   ================================================================ */
+
+/* A dialog taller than the screen scrolls inside itself; the page behind
+   it stays put. */
+.dialog,
+.review {
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.overlay {
+  padding: 12px;
+}
+
+/* Menu rows are links and buttons: give the buttons the same look as the
+   links, whatever the generic dialog button style says. Flat tint, no
+   gradient. */
+.dialog .app-menu-item {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--paper-ink);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-left: 4px solid var(--accent);
+  border-radius: 10px;
+  min-height: 48px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 10px 14px;
+}
+
+.dialog .app-menu-item:hover {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+  filter: none;
+}
+
+.dialog .app-menu-item.quiet {
+  background: none;
+  border-color: transparent;
+  color: var(--paper-ink);
+  opacity: 1;
+  font-weight: 500;
+}
+
+.dialog .app-menu-item.quiet:hover {
+  background: color-mix(in srgb, var(--paper-ink) 7%, transparent);
+}
+
+.dialog.app-menu {
+  background: var(--paper);
+  color: var(--paper-ink);
+}
+
+.dialog .app-menu-close {
+  padding: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--paper-ink) 8%, transparent);
+  color: var(--paper-ink);
+  border: none;
+}
+
+/* ---- How to play ---- */
+
+.dialog.how-to-play {
+  max-width: 520px;
+  width: 100%;
+  text-align: left;
+  gap: 16px;
+}
+
+.how-to-play section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.how-to-play h3 {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.how-to-play ul {
+  padding-left: 1.2em;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: var(--paper-ink-2);
+}
