@@ -239,7 +239,7 @@ export default function OnlineTable({
     const fresh = earnedInRound(stat, earned.current);
     for (const a of fresh) {
       earned.current.add(a.id);
-      onChat(`🏅 ${a.name}`);
+      onChat(`Earned a badge: ${a.name}`);
     }
   }, [
     game.roundOver,
@@ -505,9 +505,9 @@ export default function OnlineTable({
             <>
               <h2>
                 {watching
-                  ? `${teamName(game.roundOver.winningTeam)} win the match 🏆`
+                  ? `${teamName(game.roundOver.winningTeam)} win the match`
                   : game.roundOver.winningTeam === yourTeam
-                    ? "Your team wins the match! 🏆"
+                    ? "Your team wins the match!"
                     : "The other team wins the match"}
               </h2>
               <p className="final">
