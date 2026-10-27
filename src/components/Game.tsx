@@ -402,7 +402,7 @@ export default function Game() {
         <RoundOverlay key={state.roundNumber} delayMs={LINGER_MS}>
           {state.matchOver ? (
             <>
-              <h2>{winner === 0 ? "Your team wins the match! 🏆" : "East & West win the match"}</h2>
+              <h2>{winner === 0 ? "Your team wins the match!" : "East & West win the match"}</h2>
               <p className="final">
                 {state.matchScore[0]} — {state.matchScore[1]}
               </p>

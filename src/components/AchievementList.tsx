@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { nextUp } from "@/engine/achievements";
 import type { Achievement } from "@/engine/achievements";
+import Icon, { type IconName } from "./Icon";
 
 /**
  * The badges, wherever they are being shown.
@@ -20,22 +21,22 @@ import type { Achievement } from "@/engine/achievements";
  * achievement, not what it looks like. An id with no glyph still renders; it
  * just gets the generic one.
  */
-const GLYPH: Record<string, string> = {
-  "first-win": "🏆",
-  dominoed: "🁣",
-  capicua: "⇄",
-  tranca: "🔒",
-  pie: "↩",
-  cabeza: "👑",
-  carried: "🛟",
-  "wire-to-wire": "🏁",
-  clean: "✨",
-  sharp: "🎯",
-  "in-step": "🤖",
-  "fourteen-tiles": "👥",
-  runaway: "💨",
-  "hat-trick": "🔥",
-  partnership: "🤝",
+const GLYPH: Record<string, IconName> = {
+  "first-win": "trophy",
+  dominoed: "tile",
+  capicua: "swap",
+  tranca: "lock",
+  pie: "back",
+  cabeza: "crown",
+  carried: "buoy",
+  "wire-to-wire": "flag",
+  clean: "spark",
+  sharp: "target",
+  "in-step": "robot",
+  "fourteen-tiles": "pair",
+  runaway: "wind",
+  "hat-trick": "flame",
+  partnership: "hands",
 };
 
 const RUNG_AFTER = ["bronze", "silver", "gold", "platinum"];
@@ -75,8 +76,8 @@ function Medal({ a, size = 56 }: { a: Achievement; size?: number }) {
           />
         )}
       </svg>
-      <span className="medal-glyph" style={{ fontSize: size * 0.4 }}>
-        {GLYPH[a.id] ?? "◆"}
+      <span className="medal-glyph">
+        <Icon name={GLYPH[a.id] ?? "diamond"} size={Math.round(size * 0.42)} />
       </span>
     </span>
   );
@@ -95,7 +96,7 @@ function Ladder({ a }: { a: Achievement }) {
           }`}
           title={key}
         >
-          <i aria-hidden>{GLYPH[a.id] ?? "◆"}</i>
+          <i aria-hidden><Icon name={GLYPH[a.id] ?? "diamond"} size={14} /></i>
         </span>
       ))}
     </div>
@@ -141,7 +142,7 @@ function Detail({ a, onBack }: { a: Achievement; onBack: () => void }) {
           )}
         </svg>
         <span className="badge-ring-inner">
-          <span className="badge-ring-glyph">{GLYPH[a.id] ?? "◆"}</span>
+          <span className="badge-ring-glyph"><Icon name={GLYPH[a.id] ?? "diamond"} size={36} /></span>
           {a.progress ? (
             <>
               <b>{a.tier ? a.tier.times : a.progress.have}</b>
