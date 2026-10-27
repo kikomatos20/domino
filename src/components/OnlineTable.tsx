@@ -5,6 +5,7 @@ import type { End, GameState, Seat, Team, TileId } from "@/engine/types";
 import type { PlayerView } from "@/server/types";
 import Board from "./Board";
 import AppMenu from "./AppMenu";
+import ScoreBar from "./ScoreBar";
 import CapicuaMoment from "./CapicuaMoment";
 import TauntPrompt from "./TauntPrompt";
 import { closingPlay } from "@/engine/engine";
@@ -284,28 +285,24 @@ export default function OnlineTable({
     <main
       className={`table-root ${chatOpen ? "with-chat" : ""} ${showCapicua ? "shaken" : ""}`}
     >
-      <header className="scoreboard">
-        <div className="score us">
-          <span className="label">{watching ? teamName(0) : "Us"}</span>
-          <span className="value">{usScore}</span>
-        </div>
-        <div className="score-meta">
-          <AppMenu inGame={!game.matchOver} />
-          <span>Round {game.roundNumber}</span>
-          <span>First to {view.target}</span>
-          <span className="room-code">{view.code}</span>
-        </div>
-        <div className="score them">
-          <span className="label">{watching ? teamName(1) : "Them"}</span>
-          <span className="value">{themScore}</span>
-        </div>
-      </header>
+      <ScoreBar
+        us={usScore}
+        them={themScore}
+        usLabel={watching ? teamName(0) : "Us"}
+        themLabel={watching ? teamName(1) : "Them"}
+        target={view.target}
+        round={game.roundNumber}
+        menu={
+          <AppMenu inGame={!game.matchOver}>
+            <p className="menu-field">
+              <span>Room code</span>
+              <span className="room-code">{view.code}</span>
+            </p>
+          </AppMenu>
+        }
+      />
 
       {error && <div className="banner error-banner">{error}</div>}
-      {!error && playedBanner && <div className="banner played-banner">{playedBanner}</div>}
-      {!error && !playedBanner && !myTurn && !game.roundOver && (
-        <div className="banner">{turnName}</div>
-      )}
 
       <div className="seat seat-north">
         <OnlineSeat
@@ -320,7 +317,6 @@ export default function OnlineTable({
           info={seat(around.left)}
           reveal={game.revealed?.[around.left] ?? shown.get(around.left)}
           shown={shown.has(around.left)}
-          vertical
         />
       </div>
       <div className="seat seat-east">
@@ -328,7 +324,6 @@ export default function OnlineTable({
           info={seat(around.right)}
           reveal={game.revealed?.[around.right] ?? shown.get(around.right)}
           shown={shown.has(around.right)}
-          vertical
         />
       </div>
 
@@ -419,12 +414,19 @@ export default function OnlineTable({
           </div>
         )}
 
-        {myTurn && !game.mustPass && (
-          <div className="turn-hint">Your turn — drag a tile onto an end</div>
-        )}
-        {myTurn && game.mustPass && (
-          <div className="skipped-note">Nothing you can play — skipping your turn</div>
-        )}
+        {/* One fixed-height line for what is happening, so the hand and the
+            table never shift when it changes. */}
+        <div className="status-line" role="status" aria-live="polite">
+          {myTurn && game.mustPass ? (
+            <span className="skipped-note">Nothing you can play, skipping your turn</span>
+          ) : playedBanner ? (
+            <span className="banner played-banner">{playedBanner}</span>
+          ) : myTurn ? (
+            <span className="turn-hint">Your turn: drag a tile onto an end</span>
+          ) : !game.roundOver ? (
+            <span className="banner">{turnName}</span>
+          ) : null}
+        </div>
         {!watching && (
           <PlayableHand
             tiles={game.hand}
@@ -620,10 +622,13 @@ function OnlineSeat({
   }, 0);
 
   return (
-    <div className="seat-info">
-      <span className="seat-name">
-        {info.label}
-        {partner ? " (partner)" : ""}
+    <div
+      className="seat-info"
+      aria-label={`${info.label}${partner ? ", partner" : ""}, ${info.tilesLeft} ${info.tilesLeft === 1 ? "tile" : "tiles"}`}
+    >
+      <span className="seat-name" title={info.label}>
+        {shortLabel(info.label)}
+        {partner && <span className="seat-tag">partner</span>}
         {info.nickname && !info.connected ? " · away" : ""}
         {shown && <span className="shown-tag"> · showing you</span>}
         {reveal !== undefined && reveal.length > 0 && !shown && (
@@ -644,4 +649,10 @@ function OnlineSeat({
       </div>
     </div>
   );
+}
+
+/** "Computer (West)" fits a seat chip as "West (bot)"; people keep their names. */
+export function shortLabel(label: string): string {
+  const m = /^Computer \((\w+)\)$/.exec(label);
+  return m ? `${m[1]} (bot)` : label;
 }

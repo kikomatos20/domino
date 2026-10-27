@@ -3101,41 +3101,6 @@ body {
      how many tiles are left. */
   /* No room for a side column on a phone — the chat becomes a short row under
      your hand, so it still never covers the table. */
-  .table-root {
-    grid-template-areas:
-      "score score score"
-      "west north east"
-      "west board east"
-      "hand hand hand"
-      "chat chat chat";
-    grid-template-rows: auto auto 1fr auto auto;
-    grid-template-columns: 34px 1fr 34px;
-    gap: 2px;
-    padding: 4px;
-    /* Keep the input clear of the iOS home bar. */
-    padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px));
-  }
-
-  /* The chat row is content-sized, so it is simply absent in solo play and
-     just tall enough for the bar when the chat is collapsed. */
-  .table-root.with-chat {
-    grid-template-columns: 34px 1fr 34px;
-  }
-
-  /* No free corner on a phone — the closed bar takes its own thin row so it
-     cannot land on the hand. */
-  .chat-bar {
-    position: static;
-    grid-area: chat;
-    justify-content: center;
-    padding-top: 2px;
-  }
-
-  .chat-toggle,
-  .chat-bar .chat-collapse {
-    padding: 4px 12px;
-    font-size: 0.7rem;
-  }
 
   /* Tighter chrome so the height goes to the conversation, not the frame. */
   .chat-dock {
@@ -3180,46 +3145,6 @@ body {
     height: 180px;
   }
 
-  .tile.vertical {
-    width: 30px;
-    height: 60px;
-  }
-
-  .hand {
-    gap: 3px;
-  }
-
-  .score .value {
-    font-size: 1.15rem;
-  }
-
-  .score .label {
-    font-size: 0.6rem;
-  }
-
-  .seat-name {
-    font-size: 0.6rem;
-  }
-
-  /* Opponent tile counts: slimmer, so they don't crowd the table. */
-  .tile.small.back {
-    width: 16px;
-    height: 26px;
-  }
-
-  .backs.vertical .tile.small.back {
-    width: 26px;
-    height: 16px;
-  }
-
-  .backs {
-    gap: 2px;
-  }
-
-  .banner {
-    top: 58px;
-    font-size: 0.8rem;
-  }
 }
 
 /* ---------- looking at the table after a round ---------- */
@@ -3241,4 +3166,494 @@ body {
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 6px 18px color-mix(in srgb, var(--shade) 45%, transparent);
+}
+
+
+/* ================================================================
+   Table frame (redesign phase 1)
+
+   One layout per screen shape, chosen by the screen, not a setting:
+   - phone portrait (the base): score bar, a row of seat chips, the table
+     square as big as the width allows, then your hand;
+   - phone landscape: the table square on the left at full height, the
+     score, seats and hand on the right;
+   - wide screens: the same as portrait with room to spare, and the chat
+     as a column on the right when it is open.
+   The table itself (Board, lineLayout) is untouched: it fills .board and
+   scales its fixed-size tiles down to fit, as before.
+   ================================================================ */
+
+.table-root {
+  display: grid;
+  grid-template-areas:
+    "score score score"
+    "west north east"
+    "board board board"
+    "hand hand hand"
+    "chat chat chat";
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  height: 100dvh;
+  gap: 8px;
+  padding: 0 16px 8px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+}
+
+.table-root.with-chat {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* ---- score bar ---- */
+
+.scoreboard {
+  grid-area: score;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 6px 0;
+  background: none;
+  border-radius: 0;
+}
+
+.scoreboard .app-menu-button {
+  flex: none;
+  background: var(--surface);
+  border: none;
+  opacity: 1;
+}
+
+.score {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.score-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.score.them .score-line {
+  justify-content: flex-end;
+}
+
+.score .label {
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 1;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.score .value {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-track {
+  display: flex;
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
+  overflow: hidden;
+}
+
+.score.them .score-track {
+  justify-content: flex-end;
+}
+
+.score-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.4s ease-out;
+}
+
+.score.us .score-fill {
+  background: var(--us);
+}
+
+.score.them .score-fill {
+  background: var(--them);
+}
+
+.score-meta {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  font-size: 13px;
+  color: var(--muted);
+  opacity: 1;
+  white-space: nowrap;
+}
+
+/* ---- what the menu adds for this table ---- */
+
+.app-menu-table {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 4px;
+}
+
+.menu-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  font-size: 0.95rem;
+}
+
+.menu-field .difficulty {
+  min-height: 44px;
+  min-width: 120px;
+  margin: 0;
+  padding: 0 10px;
+  font-size: 1rem;
+  border-radius: 10px;
+  background: var(--paper-2);
+  color: var(--paper-ink);
+  border: 1px solid var(--paper-line);
+}
+
+.menu-field .room-code {
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- seat chips: name and one back per tile still held ---- */
+
+.seat-north,
+.seat-west,
+.seat-east {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.seat-west {
+  justify-content: flex-start;
+}
+
+.seat-north {
+  justify-content: center;
+}
+
+.seat-east {
+  justify-content: flex-end;
+}
+
+/* On a phone the three chips share one row, so each stacks its name over its
+   tiles; with room to spare they sit side by side. */
+.seat-info {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--surface);
+  max-width: 100%;
+}
+
+.seat-info.active {
+  background: color-mix(in srgb, var(--gold) 22%, var(--surface));
+  box-shadow: inset 0 0 0 2px var(--gold);
+}
+
+.seat-name {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* The partner always sits in the middle chip; on a phone that is enough. */
+.seat-tag {
+  display: none;
+  margin-left: 6px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.seat-info .backs,
+.seat-info .backs.vertical {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 3px;
+  max-width: none;
+  max-height: none;
+}
+
+.seat-info .tile.small.back,
+.seat-info .backs.vertical .tile.small.back {
+  width: 8px;
+  height: 16px;
+  border-radius: 2px;
+  box-shadow: none;
+}
+
+/* Leftover tiles turned face up at the end of a round. */
+.seat-info .tile.small.vertical:not(.back) {
+  width: 16px;
+  height: 32px;
+  border-radius: 3px;
+}
+
+.seat-info .tile.small:not(.back) .half {
+  padding: 1px;
+}
+
+.seat-info .tile.small:not(.back) .pip {
+  width: 3px;
+  height: 3px;
+}
+
+/* ---- the table ---- */
+
+/* The table's own 8px inset becomes the page gutter, so the square gets the
+   full width between the 16px margins. */
+.board {
+  grid-area: board;
+  margin: 0 -8px;
+}
+
+/* ---- your hand and the line above it ---- */
+
+.hand-area {
+  grid-area: hand;
+  gap: 6px;
+  padding: 0;
+}
+
+.status-line {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+}
+
+/* Inside the status line, a banner is just text: never on top of the score. */
+.status-line .banner {
+  position: static;
+  transform: none;
+  padding: 6px 14px;
+  font-size: 14px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.status-line .played-banner {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: none;
+  font-weight: 600;
+}
+
+.status-line .turn-hint {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--gold-ink);
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.status-line .skipped-note {
+  font-size: 14px;
+  padding: 6px 14px;
+}
+
+.hand {
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.hand .tile.vertical {
+  width: 44px;
+  height: 88px;
+}
+
+.hand .tile .pip {
+  width: 7px;
+  height: 7px;
+}
+
+/* Error messages float, but under the score bar, never over it. */
+.error-banner {
+  top: 64px;
+}
+
+/* ---- chat and feedback ---- */
+
+/* Closed: a row of two pills under your hand. */
+.chat-bar {
+  position: static;
+  grid-area: chat;
+  justify-content: center;
+  gap: 8px;
+}
+
+.chat-toggle,
+.chat-bar .chat-collapse {
+  min-height: 44px;
+  padding: 0 18px;
+  font-size: 14px;
+  opacity: 1;
+  background: var(--surface);
+  border: none;
+}
+
+.chat-toggle.unread {
+  box-shadow: inset 0 0 0 2px var(--gold);
+}
+
+/* Open on a phone: a sheet over the bottom of the screen, on top of your
+   hand, so the table above it keeps its size. */
+.chat-dock {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  height: min(50dvh, 360px);
+  z-index: 130;
+  background: var(--paper);
+  color: var(--paper-ink);
+  border: 1px solid var(--paper-line);
+  box-shadow: 0 -8px 30px color-mix(in srgb, var(--shade) 45%, transparent);
+}
+
+.chat-head .chat-collapse {
+  min-height: 36px;
+  padding: 0 14px;
+}
+
+/* Solo has no chat bar, so Feedback floats; keep it out of the hand's row. */
+.feedback-fab {
+  top: 10px;
+  bottom: auto;
+  right: 16px;
+  min-height: 44px;
+  opacity: 1;
+  background: var(--surface);
+  border: none;
+  display: none;
+}
+
+/* ---- phone landscape: table left, everything else right ---- */
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .table-root,
+  .table-root.with-chat {
+    grid-template-areas:
+      "board score score score"
+      "board west north east"
+      "board . . ."
+      "board hand hand hand"
+      "board chat chat chat";
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+    grid-template-columns: calc(100dvh - 16px) repeat(3, minmax(0, 1fr));
+    padding: 8px 16px 8px 8px;
+    column-gap: 16px;
+    row-gap: 6px;
+  }
+
+  .scoreboard {
+    min-height: 48px;
+    padding: 0;
+  }
+
+  .status-line {
+    height: 28px;
+  }
+
+  .board {
+    margin: 0;
+  }
+
+  .seat-info {
+    padding: 4px 8px;
+  }
+
+  /* The chat sheet covers the right column only, never the table. */
+  .chat-dock {
+    left: calc(100dvh + 8px);
+    right: 8px;
+    height: auto;
+    top: 8px;
+  }
+}
+
+/* ---- wide screens: the open chat is a column, not a sheet ---- */
+
+@media (min-width: 1024px) and (min-height: 600px) {
+  /* The seats stay near the table instead of drifting to the screen edges. */
+  .table-root {
+    padding: 8px 24px 16px;
+    max-width: 780px;
+    margin: 0 auto;
+  }
+
+  .seat-info {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .seat-tag {
+    display: inline;
+  }
+
+  .seat-info .tile.small.back,
+  .seat-info .backs.vertical .tile.small.back {
+    width: 9px;
+    height: 18px;
+  }
+
+  .table-root.with-chat {
+    max-width: 1100px;
+    grid-template-areas:
+      "score score score chat"
+      "west north east chat"
+      "board board board chat"
+      "hand hand hand chat";
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) 300px;
+  }
+
+  .table-root.with-chat .chat-dock {
+    position: static;
+    height: auto;
+    box-shadow: none;
+  }
+
+  /* Closed chat on a wide screen tucks into the corner beside the hand. */
+  .chat-bar {
+    position: fixed;
+    left: 16px;
+    bottom: 16px;
+  }
 }

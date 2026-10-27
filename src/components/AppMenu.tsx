@@ -31,9 +31,12 @@ export default function AppMenu({
   className = "",
   /** A match is in progress, so walking away is worth asking about. */
   inGame = false,
+  children,
 }: {
   className?: string;
   inGame?: boolean;
+  /** Settings for the table you are at (difficulty, room code), shown first. */
+  children?: React.ReactNode;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -135,6 +138,8 @@ export default function AppMenu({
                 <Icon name="close" size={18} />
               </button>
             </header>
+
+            {children && <section className="app-menu-table">{children}</section>}
 
             {/* Accents match the stats page: purple for the computer, blue for
                 people, gold for you. */}

@@ -26,6 +26,7 @@ import RoundOverlay from "./RoundOverlay";
 import Board from "./Board";
 import type { EndAnchors } from "./Board";
 import AppMenu from "./AppMenu";
+import ScoreBar from "./ScoreBar";
 import CapicuaMoment from "./CapicuaMoment";
 import TauntPrompt, { MAX_TAUNT } from "./TauntPrompt";
 import { reportSolo, reportSoloRound } from "@/lib/auth";
@@ -270,43 +271,56 @@ export default function Game() {
   return (
     <main className={`table-root ${showCapicua ? "shaken" : ""}`}>
       {/* Scoreboard */}
-      <header className="scoreboard">
-        <div className="score us">
-          <span className="label">Us (You + Partner)</span>
-          <span className="value">{state.matchScore[0]}</span>
-        </div>
-        <div className="score-meta">
-          <AppMenu inGame={!state.matchOver} />
-          <span>Round {state.roundNumber}</span>
-          <span>First to {state.target}</span>
-          <select
-            className="difficulty"
-            value={difficulty}
-            onChange={(e) => setDifficulty(e.target.value as Difficulty)}
-            aria-label="Opponent difficulty"
-          >
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
-          </select>
-        </div>
-        <div className="score them">
-          <span className="label">Them (East + West)</span>
-          <span className="value">{state.matchScore[1]}</span>
-        </div>
-      </header>
-
-      {banner && <div className="banner">{banner}</div>}
+      <ScoreBar
+        us={state.matchScore[0]}
+        them={state.matchScore[1]}
+        target={state.target}
+        round={state.roundNumber}
+        menu={
+          <AppMenu inGame={!state.matchOver}>
+            <label className="menu-field">
+              <span>Opponents</span>
+              <select
+                className="difficulty"
+                value={difficulty}
+                onChange={(e) => setDifficulty(e.target.value as Difficulty)}
+                aria-label="Opponent difficulty"
+              >
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+            </label>
+            <FeedbackButton
+              className="app-menu-item quiet"
+              label="Send feedback"
+              context={() => ({
+                kind: "general",
+                mode: "solo",
+                about: `Round ${state.roundNumber} against the computer (${difficulty})`,
+                payload: {
+                  line: state.line,
+                  ends: [state.leftEnd, state.rightEnd],
+                  hand: state.hands[HUMAN],
+                  currentSeat: state.currentSeat,
+                  matchScore: state.matchScore,
+                  difficulty,
+                },
+              })}
+            />
+          </AppMenu>
+        }
+      />
 
       {/* Opponents / partner */}
       <div className="seat seat-north">
         <SeatInfo seat={2} state={state} />
       </div>
       <div className="seat seat-west">
-        <SeatInfo seat={3} state={state} vertical />
+        <SeatInfo seat={3} state={state} />
       </div>
       <div className="seat seat-east">
-        <SeatInfo seat={1} state={state} vertical />
+        <SeatInfo seat={1} state={state} />
       </div>
 
       {/* The line */}
@@ -324,12 +338,17 @@ export default function Game() {
 
       {/* Human hand */}
       <div className="hand-area">
-        {humanTurn && !humanMustPass && (
-          <div className="turn-hint">Your turn — drag a tile onto an end</div>
-        )}
-        {humanMustPass && (
-          <div className="skipped-note">Nothing you can play — skipping your turn</div>
-        )}
+        {/* One fixed-height line for what is happening, so the hand and the
+            table never shift when it changes. */}
+        <div className="status-line" role="status" aria-live="polite">
+          {humanMustPass ? (
+            <span className="skipped-note">Nothing you can play, skipping your turn</span>
+          ) : banner ? (
+            <span className="banner">{banner}</span>
+          ) : humanTurn ? (
+            <span className="turn-hint">Your turn: drag a tile onto an end</span>
+          ) : null}
+        </div>
         <PlayableHand
           tiles={state.hands[HUMAN]}
           legalMoves={myMoves}
@@ -424,21 +443,6 @@ export default function Game() {
         />
       )}
 
-      <FeedbackButton
-        context={() => ({
-          kind: "general",
-          mode: "solo",
-          about: `Round ${state.roundNumber} against the computer (${difficulty})`,
-          payload: {
-            line: state.line,
-            ends: [state.leftEnd, state.rightEnd],
-            hand: state.hands[HUMAN],
-            currentSeat: state.currentSeat,
-            matchScore: state.matchScore,
-            difficulty,
-          },
-        })}
-      />
     </main>
   );
 }
@@ -462,10 +466,12 @@ function SeatInfo({
   const pips = hand.reduce((sum, id) => sum + tilePips(id), 0);
 
   return (
-    <div className={`seat-info ${active ? "active" : ""}`}>
+    <div
+      className={`seat-info ${active ? "active" : ""}`}
+      aria-label={`${SEAT_NAMES[seat]}, ${hand.length} ${hand.length === 1 ? "tile" : "tiles"}${active ? ", playing" : ""}`}
+    >
       <span className="seat-name">
         {SEAT_NAMES[seat]}
-        {seat === 2 ? " (your partner)" : ""}
         {reveal && hand.length > 0 && <span className="left-pips"> · {pips}</span>}
       </span>
       <div className={`backs ${vertical ? "vertical" : ""}`}>
