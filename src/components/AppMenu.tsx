@@ -16,6 +16,7 @@ import {
 } from "@/lib/auth";
 import AchievementList from "./AchievementList";
 import Icon, { type IconName } from "./Icon";
+import HowToPlay from "./HowToPlay";
 import { LOOKS, applyLook, readLook, type Look } from "@/lib/look";
 
 /**
@@ -59,6 +60,7 @@ export default function AppMenu({
   useEffect(() => setMounted(true), []);
   /** The table look, read once the page is in the browser. */
   const [look, setLook] = useState<Look>("a");
+  const [rules, setRules] = useState(false);
   const menuRef = useRef<HTMLElement>(null);
   const badgesRef = useRef<HTMLDivElement>(null);
   const leaveRef = useRef<HTMLDivElement>(null);
@@ -248,15 +250,18 @@ export default function AppMenu({
               </div>
             </section>
 
-            <details className="how-to">
-              <summary>How to play</summary>
-              <ul>
-                <li>Tap a tile to flip it. Double-tap it (or press Enter) to play it.</li>
-                <li>If it fits both ends, both light up: tap the one you want.</li>
-                <li>You can still drag a tile onto an end, or within your hand to sort it.</li>
-                <li>Hold any tile to read it up close.</li>
-              </ul>
-            </details>
+            <button
+              className="app-menu-item quiet how-to-open"
+              onClick={() => {
+                setOpen(false);
+                setRules(true);
+              }}
+            >
+              <span className="app-menu-glyph" aria-hidden>
+                <Icon name="book" />
+              </span>
+              How to play
+            </button>
 
             {/* Only true if there is actually a table to go back to. */}
             {inGame && (
@@ -307,6 +312,8 @@ export default function AppMenu({
           </div>
         </div>
       )}
+
+      {rules && portal(<HowToPlay onClose={() => setRules(false)} />)}
 
       {leavingTo && portal(
         <div className="overlay" onClick={() => setLeavingTo(null)}>

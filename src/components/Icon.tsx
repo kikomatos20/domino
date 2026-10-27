@@ -3,7 +3,7 @@
  * Unicode glyphs the menu used to carry, which looked different on every
  * phone and could not take the look's colours.
  */
-export type IconName = "menu" | "close" | "home" | "computer" | "friends" | "record" | "medal" | "check";
+export type IconName = "menu" | "close" | "home" | "computer" | "friends" | "record" | "medal" | "check" | "book";
 
 const PATHS: Record<IconName, string> = {
   menu: "M4 6h16M4 12h16M4 18h16",
@@ -14,6 +14,7 @@ const PATHS: Record<IconName, string> = {
   record: "M12 3l2.6 5.6 6 .6-4.5 4.1 1.3 6L12 16.3 6.6 19.3l1.3-6L3.4 9.2l6-.6z",
   medal: "M8 3h8l-2 6h-4zM12 21a6 6 0 1 0 0-12 6 6 0 0 0 0 12z",
   check: "M5 12.5l4.5 4.5L19 7.5",
+  book: "M4 5.5C6.5 4 9.5 4 12 5.5v14c-2.5-1.5-5.5-1.5-8 0zM20 5.5C17.5 4 14.5 4 12 5.5v14c2.5-1.5 5.5-1.5 8 0z",
 };
 
 export default function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
