@@ -14,6 +14,8 @@ import {
   type Stats,
 } from "@/lib/auth";
 import AchievementList from "./AchievementList";
+import Icon, { type IconName } from "./Icon";
+import { LOOKS, applyLook, readLook, type Look } from "@/lib/look";
 
 /**
  * Getting anywhere from anywhere.
@@ -23,7 +25,7 @@ import AchievementList from "./AchievementList";
  * button that opens the same short list everywhere.
  */
 /** href, label, accent colour, and a glyph to carry it. */
-type Item = [string, string, string, string];
+type Item = [string, string, string, IconName];
 
 export default function AppMenu({
   className = "",
@@ -51,6 +53,9 @@ export default function AppMenu({
   /** Portals need a document, which the server render does not have. */
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  /** The table look, read once the page is in the browser. */
+  const [look, setLook] = useState<Look>("a");
+  useEffect(() => setLook(readLook()), []);
 
   /**
    * Follow a link, or stop and ask first.
@@ -103,7 +108,7 @@ export default function AppMenu({
         aria-label={account ? `Menu — signed in as ${account.username}` : "Menu"}
         title={account ? `Signed in as ${account.username}` : "Menu"}
       >
-        ☰
+        <Icon name="menu" />
         {account && (
           // The initial rather than a bare dot: at a glance it says *who*,
           // which matters on a shared laptop.
@@ -127,19 +132,19 @@ export default function AppMenu({
                 onClick={() => setOpen(false)}
                 aria-label="Close"
               >
-                ×
+                <Icon name="close" size={18} />
               </button>
             </header>
 
             {/* Accents match the stats page: purple for the computer, blue for
                 people, gold for you. */}
             {([
-              ["/", "Home", "gold", "🁣"],
-              ["/solo", "Play vs Computer", "violet", "🖳"],
-              ["/online", "Play with Friends", "sky", "🀱"],
+              ["/", "Home", "gold", "home"],
+              ["/solo", "Play vs Computer", "violet", "computer"],
+              ["/online", "Play with Friends", "sky", "friends"],
               ...(accountsAvailable()
                 ? ([
-                    ["/account", account ? "Your record" : "Sign in", "leaf", "★"],
+                    ["/account", account ? "Your record" : "Sign in", "leaf", "record"],
                   ] as Item[])
                 : []),
             ] as Item[]).map(([href, label, accent, glyph]) => (
@@ -153,7 +158,7 @@ export default function AppMenu({
                 }}
               >
                 <span className="app-menu-glyph" aria-hidden>
-                  {glyph}
+                  <Icon name={glyph} />
                 </span>
                 {label}
               </Link>
@@ -176,7 +181,7 @@ export default function AppMenu({
                 }}
               >
                 <span className="app-menu-glyph" aria-hidden>
-                  🏅
+                  <Icon name="medal" />
                 </span>
                 Achievements
               </button>
@@ -193,6 +198,36 @@ export default function AppMenu({
                 Sign out
               </button>
             )}
+
+            {/* The look changes in place, mid-match included: it is only colour. */}
+            <section className="look-picker" aria-labelledby="look-picker-title">
+              <h3 id="look-picker-title">Table look</h3>
+              <div className="look-options">
+                {LOOKS.map((l) => (
+                  <button
+                    key={l.id}
+                    className={`look-option ${look === l.id ? "on" : ""}`}
+                    data-look={l.id}
+                    aria-pressed={look === l.id}
+                    onClick={() => {
+                      applyLook(l.id);
+                      setLook(l.id);
+                    }}
+                  >
+                    <span className="look-swatch" aria-hidden>
+                      <span className="look-felt">
+                        <span className="look-tile" />
+                      </span>
+                    </span>
+                    <span className="look-text">
+                      <span className="look-name">{l.name}</span>
+                      <span className="look-note">{l.note}</span>
+                    </span>
+                    {look === l.id && <Icon name="check" size={18} />}
+                  </button>
+                ))}
+              </div>
+            </section>
 
             {/* Only true if there is actually a table to go back to. */}
             {inGame && (
@@ -223,7 +258,7 @@ export default function AppMenu({
                 onClick={() => setBadges(null)}
                 aria-label="Close"
               >
-                ×
+                <Icon name="close" size={18} />
               </button>
             </header>
 
