@@ -22,7 +22,7 @@ import DominoTile from "./DominoTile";
 import FeedbackButton from "./FeedbackButton";
 import PlayableHand from "./PlayableHand";
 import ReviewPanel from "./ReviewPanel";
-import RoundOverlay from "./RoundOverlay";
+import RoundOverlay, { LINGER_MS } from "./RoundOverlay";
 import Board from "./Board";
 import type { EndAnchors } from "./Board";
 import AppMenu from "./AppMenu";
@@ -63,6 +63,12 @@ export default function Game() {
     const saved = window.localStorage.getItem("domino:difficulty");
     if (saved === "easy" || saved === "medium" || saved === "hard") setDifficulty(saved);
     setNoFiveDoubles(window.localStorage.getItem("domino:noFiveDoubles") === "1");
+    // From Home's Play button: someone who has chosen a level before goes
+    // straight to the deal (it can still be changed in the menu). A first
+    // visit still asks, so nobody's first round is a level they never chose.
+    if (saved && new URLSearchParams(window.location.search).get("quick") === "1") {
+      setStarted(true);
+    }
   }, []);
 
   /** The deal limit this table is playing under, or null for the plain shuffle. */
@@ -283,7 +289,11 @@ export default function Game() {
               <select
                 className="difficulty"
                 value={difficulty}
-                onChange={(e) => setDifficulty(e.target.value as Difficulty)}
+                onChange={(e) => {
+                  const level = e.target.value as Difficulty;
+                  setDifficulty(level);
+                  window.localStorage.setItem("domino:difficulty", level);
+                }}
                 aria-label="Opponent difficulty"
               >
                 <option value="easy">Easy</option>
@@ -341,7 +351,16 @@ export default function Game() {
         {/* One fixed-height line for what is happening, so the hand and the
             table never shift when it changes. */}
         <div className="status-line" role="status" aria-live="polite">
-          {humanMustPass ? (
+          {state.roundOver ? (
+            <span className="banner round-result">
+              {state.roundOver.kind === "domino" &&
+                `${SEAT_NAMES[state.roundOver.winnerSeat!]} dominoed`}
+              {state.roundOver.kind === "blocked" && "Blocked (tranca)"}
+              {state.roundOver.kind === "tie" && "Blocked, dead tie"}
+              {state.roundOver.winningTeam !== null &&
+                ` · +${state.roundOver.points} ${state.roundOver.winningTeam === 0 ? "Us" : "Them"}`}
+            </span>
+          ) : humanMustPass ? (
             <span className="skipped-note">Nothing you can play, skipping your turn</span>
           ) : banner ? (
             <span className="banner">{banner}</span>
@@ -380,7 +399,7 @@ export default function Game() {
 
       {/* Round / match end */}
       {state.roundOver && !reviewing && !showCapicua && (
-        <RoundOverlay key={state.roundNumber}>
+        <RoundOverlay key={state.roundNumber} delayMs={LINGER_MS}>
           {state.matchOver ? (
             <>
               <h2>{winner === 0 ? "Your team wins the match! 🏆" : "East & West win the match"}</h2>
@@ -467,7 +486,9 @@ function SeatInfo({
 
   return (
     <div
-      className={`seat-info ${active ? "active" : ""}`}
+      className={`seat-info ${active ? "active" : ""} ${
+        reveal && state.roundOver?.winningTeam === seat % 2 ? "won" : ""
+      }`}
       aria-label={`${SEAT_NAMES[seat]}, ${hand.length} ${hand.length === 1 ? "tile" : "tiles"}${active ? ", playing" : ""}`}
     >
       <span className="seat-name">

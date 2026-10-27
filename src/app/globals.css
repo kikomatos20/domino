@@ -3909,3 +3909,206 @@ summary,
   line-height: 1.45;
   color: var(--paper-ink-2);
 }
+
+/* ================================================================
+   Flow and round end (redesign phase 3)
+   ================================================================ */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---- Home: join with a code ---- */
+
+.home-join {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+}
+
+.home-join-row {
+  display: flex;
+  gap: 8px;
+}
+
+.home-join input {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.home-join button {
+  flex: none;
+  min-height: 48px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 10px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.home-join button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ---- Join card: waiting for the next match ---- */
+
+.wait-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  text-align: left;
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.wait-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--gold);
+  animation: wait-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes wait-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* ---- Round over ---- */
+
+/* The winning pair's chips, with their leftover tiles face up. */
+.seat-info.won {
+  box-shadow: inset 0 0 0 2px var(--gold);
+}
+
+.status-line .round-result {
+  background: var(--gold);
+  color: var(--gold-ink);
+  font-weight: 700;
+}
+
+/* The results card sits at the bottom, under the table, and nothing dims
+   the board: the finished table and everyone's tiles stay readable. */
+.overlay.round-over {
+  background: none;
+  align-items: flex-end;
+  pointer-events: none;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+}
+
+.overlay.round-over .dialog {
+  pointer-events: auto;
+  width: min(100%, 420px);
+  max-height: 46dvh;
+  padding: 16px 18px;
+  gap: 8px;
+  box-shadow: 0 -6px 30px color-mix(in srgb, var(--shade) 50%, transparent);
+  animation: card-up 0.28s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.overlay.round-over .dialog h2 {
+  font-size: 1.1rem;
+}
+
+.overlay.round-over .dialog button {
+  min-height: 44px;
+}
+
+@keyframes card-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .overlay.round-over {
+    justify-content: flex-end;
+    align-items: center;
+  }
+
+  .overlay.round-over .dialog {
+    width: min(46vw, 400px);
+    max-height: calc(100dvh - 24px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay.round-over .dialog,
+  .wait-dot {
+    animation: none;
+  }
+}
+
+/* ---- Review: three tabs that always fit ---- */
+
+.lens-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 0 16px 12px;
+}
+
+.lens-tabs button {
+  min-height: 48px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  line-height: 1.15;
+  font-size: 0.85rem;
+  background: var(--paper-2);
+  color: var(--paper-ink);
+}
+
+.lens-tabs button .tab-badge {
+  margin-left: 0;
+  white-space: nowrap;
+  font-size: 0.68rem;
+}
+
+/* The role band reads in every look: the seat's role in ink, not felt
+   green on a green-tinted panel. */
+.role-band {
+  margin: 0 16px 12px;
+  border-left-color: var(--gold);
+}
+
+.role-name {
+  font-size: 0.9rem;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--paper-ink);
+}

@@ -18,7 +18,7 @@ import FeedbackButton from "./FeedbackButton";
 import type { FeedbackContext } from "./FeedbackForm";
 import PlayableHand from "./PlayableHand";
 import ReviewPanel from "./ReviewPanel";
-import RoundOverlay from "./RoundOverlay";
+import RoundOverlay, { LINGER_MS } from "./RoundOverlay";
 import TableChat from "./TableChat";
 import { useFading, useReplay } from "./useReplay";
 
@@ -309,6 +309,7 @@ export default function OnlineTable({
           info={seat(around.top)}
           reveal={game.revealed?.[around.top] ?? shown.get(around.top)}
           shown={shown.has(around.top)}
+          won={game.roundOver?.winningTeam === around.top % 2}
           partner
         />
       </div>
@@ -317,6 +318,7 @@ export default function OnlineTable({
           info={seat(around.left)}
           reveal={game.revealed?.[around.left] ?? shown.get(around.left)}
           shown={shown.has(around.left)}
+          won={game.roundOver?.winningTeam === around.left % 2}
         />
       </div>
       <div className="seat seat-east">
@@ -324,6 +326,7 @@ export default function OnlineTable({
           info={seat(around.right)}
           reveal={game.revealed?.[around.right] ?? shown.get(around.right)}
           shown={shown.has(around.right)}
+          won={game.roundOver?.winningTeam === around.right % 2}
         />
       </div>
 
@@ -417,7 +420,16 @@ export default function OnlineTable({
         {/* One fixed-height line for what is happening, so the hand and the
             table never shift when it changes. */}
         <div className="status-line" role="status" aria-live="polite">
-          {myTurn && game.mustPass ? (
+          {game.roundOver ? (
+            <span className="banner round-result">
+              {game.roundOver.kind === "domino" &&
+                `${seat(game.roundOver.winnerSeat!).isYou ? "You" : shortLabel(seat(game.roundOver.winnerSeat!).label)} dominoed`}
+              {game.roundOver.kind === "blocked" && "Blocked (tranca)"}
+              {game.roundOver.kind === "tie" && "Blocked, dead tie"}
+              {game.roundOver.winningTeam !== null &&
+                ` · +${game.roundOver.points}`}
+            </span>
+          ) : myTurn && game.mustPass ? (
             <span className="skipped-note">Nothing you can play, skipping your turn</span>
           ) : playedBanner ? (
             <span className="banner played-banner">{playedBanner}</span>
@@ -488,7 +500,7 @@ export default function OnlineTable({
       )}
 
       {game.roundOver && !reviewing && !replay.catchingUp && !showCapicua && (
-        <RoundOverlay key={game.roundNumber}>
+        <RoundOverlay key={game.roundNumber} delayMs={replay.catchingUp ? 0 : LINGER_MS}>
           {game.matchOver ? (
             <>
               <h2>
@@ -603,6 +615,7 @@ function OnlineSeat({
   shown = false,
   vertical = false,
   partner = false,
+  won = false,
 }: {
   info: PlayerView["seats"][number];
   /** Their leftover tiles, once the round has finished. */
@@ -615,6 +628,8 @@ function OnlineSeat({
   shown?: boolean;
   vertical?: boolean;
   partner?: boolean;
+  /** On the team that took the round just finished. */
+  won?: boolean;
 }) {
   const pips = reveal?.reduce((sum, id) => {
     const [a, b] = id.split("-").map(Number);
@@ -623,7 +638,7 @@ function OnlineSeat({
 
   return (
     <div
-      className="seat-info"
+      className={`seat-info ${won ? "won" : ""}`}
       aria-label={`${info.label}${partner ? ", partner" : ""}, ${info.tilesLeft} ${info.tilesLeft === 1 ? "tile" : "tiles"}`}
     >
       <span className="seat-name" title={info.label}>
