@@ -252,24 +252,38 @@ export default function RoomClient({ code }: { code: string }) {
         <div className="home-card">
           <h1>Table {view.code}</h1>
           {view.status !== "lobby" ? (
-            <p className="home-sub">This game has already started.</p>
+            <>
+              {/* Not a dead end: this page keeps checking, and offers a seat
+                  the moment the table is back in the lobby. */}
+              <p className="home-sub">
+                A match is in progress with {seatedNames(view)}.
+              </p>
+              <p className="wait-note" role="status">
+                <span className="wait-dot" aria-hidden /> Waiting for the next match. Keep this
+                page open and you can take a seat as soon as they finish.
+              </p>
+            </>
           ) : full ? (
             <p className="home-sub">This table is full.</p>
           ) : (
             <>
-              <p className="home-sub">Join this table.</p>
+              <p className="home-sub">
+                {openSeats(view)} {openSeats(view) === 1 ? "seat" : "seats"} open
+                {seatedNames(view) ? ` · with ${seatedNames(view)}` : ""}
+              </p>
               <label className="field">
                 <span>Your name</span>
                 <input
                   value={nickname}
                   onChange={(e) => setNickname(e.target.value)}
                   maxLength={16}
-                  placeholder="Kiko"
+                  placeholder="Your name…"
+                  autoComplete="nickname"
                 />
               </label>
               <button
                 className="home-button primary"
-                disabled={busy}
+                disabled={busy || !nickname.trim()}
                 onClick={async () => {
                   setBusy(true);
                   setError(null);
@@ -285,7 +299,7 @@ export default function RoomClient({ code }: { code: string }) {
                   }
                 }}
               >
-                Join table
+                Take a seat
               </button>
             </>
           )}
@@ -362,4 +376,19 @@ export default function RoomClient({ code }: { code: string }) {
       }}
     />
   );
+}
+
+/** The people (not computers) already at a table, as a readable list. */
+export function seatedNames(view: Pick<PlayerView, "seats">): string {
+  const people = view.seats.filter((s) => s.nickname && !s.isAi).map((s) => s.nickname as string);
+  const bots = view.seats.filter((s) => s.isAi).length;
+  const parts = [...people];
+  if (bots) parts.push(bots === 1 ? "a computer player" : `${bots} computer players`);
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
+/** Seats a newcomer can take: empty, or held by the computer. */
+export function openSeats(view: Pick<PlayerView, "seats">): number {
+  return view.seats.filter((s) => !s.nickname || s.isAi).length;
 }

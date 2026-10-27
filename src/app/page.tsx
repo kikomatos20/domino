@@ -1,5 +1,6 @@
 import Link from "next/link";
 import AppMenu from "@/components/AppMenu";
+import HomeJoin from "@/components/HomeJoin";
 
 export default function Home() {
   return (
@@ -10,7 +11,8 @@ export default function Home() {
         <p className="home-sub">Partner dominoes, double six. First team to 100.</p>
 
         <div className="home-actions">
-          <Link className="home-button primary" href="/solo">
+          {/* Straight into a deal at your usual level; first-timers pick one. */}
+          <Link className="home-button primary" href="/solo?quick=1">
             Play vs Computer
           </Link>
           <Link className="home-button" href="/online">
@@ -23,10 +25,7 @@ export default function Home() {
           </div>
         </div>
 
-        <p className="home-note">
-          Playing with friends creates a room code you can share. Empty seats can
-          be filled by the computer.
-        </p>
+        <HomeJoin />
 
         <p className="home-note">
           <Link className="quiet-link" href="/account">

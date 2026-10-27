@@ -14,3 +14,12 @@ describe("the round-over dialog", () => {
     expect(html).toContain("See everyone&#x27;s tiles");
   });
 });
+
+describe("the round-over linger", () => {
+  it("shows nothing at first when asked to wait, so the board is seen first", () => {
+    const html = renderToStaticMarkup(
+      createElement(RoundOverlay, { delayMs: 4000, children: createElement("h2", null, "West dominoed!") })
+    );
+    expect(html).toBe("");
+  });
+});
