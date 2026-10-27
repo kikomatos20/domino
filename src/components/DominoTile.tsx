@@ -52,6 +52,11 @@ export interface DominoTileProps {
   onPointerLeave?: (e: React.PointerEvent) => void;
   className?: string;
   style?: React.CSSProperties;
+  /** Makes the tile reachable from the keyboard. */
+  tabIndex?: number;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLDivElement>) => void;
+  /** What a screen reader says for it, e.g. "5|6, playable". */
+  label?: string;
 }
 
 export default function DominoTile({
@@ -69,6 +74,9 @@ export default function DominoTile({
   onPointerLeave,
   className = "",
   style,
+  tabIndex,
+  onKeyDown,
+  label,
 }: DominoTileProps) {
   const cls = [
     "tile",
@@ -93,6 +101,9 @@ export default function DominoTile({
       onPointerCancel={onPointerCancel}
       onPointerLeave={onPointerLeave}
       role={onClick || onPointerDown ? "button" : undefined}
+      tabIndex={tabIndex}
+      onKeyDown={onKeyDown}
+      aria-label={label}
     >
       {!back && (
         <>

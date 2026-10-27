@@ -422,7 +422,7 @@ export default function OnlineTable({
           ) : playedBanner ? (
             <span className="banner played-banner">{playedBanner}</span>
           ) : myTurn ? (
-            <span className="turn-hint">Your turn: drag a tile onto an end</span>
+            <span className="turn-hint">Your turn: double-tap a tile to play</span>
           ) : !game.roundOver ? (
             <span className="banner">{turnName}</span>
           ) : null}

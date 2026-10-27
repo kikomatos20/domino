@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useModal } from "./useModal";
 import { savedNickname } from "@/lib/client";
 
 export interface FeedbackContext {
@@ -31,6 +32,8 @@ export default function FeedbackForm({
   const [rating, setRating] = useState<number | null>(null);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+  useModal(boxRef, onClose);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -78,7 +81,14 @@ export default function FeedbackForm({
 
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="dialog feedback" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="dialog feedback"
+        ref={boxRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Feedback"
+        onClick={(e) => e.stopPropagation()}
+      >
         {sent ? (
           <>
             <h2>Thanks</h2>

@@ -8,6 +8,7 @@ import ZoomedTile, { HOLD_MS } from "./ZoomedTile";
 import type { EndAnchors } from "./Board";
 import { resolveDrop, type Rect } from "./dropTarget";
 import { flipTile, moveTile, reconcileOrder, slotAt } from "./handOrder";
+import { isDoubleTap, tapIntent, tileLabel, type Tap } from "./tapPlay";
 import {
   GHOST_LEAN,
   GHOST_SCALE,
@@ -25,6 +26,9 @@ function inHandRow(r: Rect, x: number, y: number): boolean {
 
 /** How long tiles take to slide into a new place. */
 const SLIDE_MS = 160;
+
+/** Remembers that the how-to-play hint has been seen on this device. */
+export const HINT_KEY = "domino.hint.tapPlay";
 
 /** Movement before a press becomes a drag rather than a tap. */
 const DRAG_THRESHOLD = 6;
@@ -95,6 +99,11 @@ export default function PlayableHand({
   const ghostRef = useRef<HTMLDivElement>(null);
   /** Straightens the held tile up when the finger stops moving. */
   const settleTilt = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** The last tap, to tell a double-tap (play) from a tap (turn round). */
+  const lastTap = useRef<Tap | null>(null);
+  /** A tile that fits both ends, waiting for you to pick one. */
+  const [choosing, setChoosing] = useState<TileId | null>(null);
+  const endButtons = useRef<HTMLDivElement>(null);
 
   const cancelHold = useCallback(() => {
     if (holdTimer.current) clearTimeout(holdTimer.current);
@@ -111,6 +120,57 @@ export default function PlayableHand({
   );
 
   const canPlay = (id: TileId) => yourTurn && !disabled && playable.has(id);
+
+  /** Play a tile without dragging it: straight on, or offer both ends. */
+  const playByTap = (id: TileId) => {
+    if (!canPlay(id)) return;
+    const intent = tapIntent(legalMoves, id);
+    if (intent.kind === "play") {
+      setChoosing(null);
+      onPlay(id, intent.end);
+    } else if (intent.kind === "choose") {
+      setChoosing(id);
+    }
+  };
+
+  // Anything that changes what you can play drops a pending choice.
+  useEffect(() => {
+    if (choosing && !(yourTurn && !disabled && playable.has(choosing))) setChoosing(null);
+  }, [choosing, yourTurn, disabled, playable]);
+
+  // Tapping anywhere but an end or your hand puts the choice away.
+  useEffect(() => {
+    if (!choosing) return;
+    const away = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      if (!t?.closest(".end-choice, .hand")) setChoosing(null);
+    };
+    window.addEventListener("pointerdown", away);
+    return () => window.removeEventListener("pointerdown", away);
+  }, [choosing]);
+
+  /** Shown once, the first time someone sits at a table on this device. */
+  const [showHint, setShowHint] = useState(false);
+  useEffect(() => {
+    try {
+      setShowHint(!localStorage.getItem(HINT_KEY));
+    } catch {
+      setShowHint(false);
+    }
+  }, []);
+  const dismissHint = () => {
+    setShowHint(false);
+    try {
+      localStorage.setItem(HINT_KEY, "1");
+    } catch {
+      // Storage blocked: it just shows again next visit.
+    }
+  };
+
+  // Choosing an end from the keyboard: focus moves to the end buttons.
+  useEffect(() => {
+    if (choosing) endButtons.current?.querySelector<HTMLButtonElement>("button")?.focus();
+  }, [choosing]);
 
   // Only a tile on the move lights the ends: a press may still be a tap.
   const active = drag?.moved ? drag.tileId : null;
@@ -278,9 +338,19 @@ export default function PlayableHand({
         if (slot !== null) setOrder(moveTile(shown, drag.tileId, slot));
         landing.current = { tileId: drag.tileId, pose: ghostPose(drag, e.clientX, e.clientY, true) };
       } else {
-        // A tap turns the tile round, and that is all it does.
-        setFlipped((f) => flipTile(f, drag.tileId));
-        setTurning((t) => ({ id: drag.tileId, n: (t?.n ?? 0) + 1 }));
+        const now = performance.now();
+        if (isDoubleTap(lastTap.current, drag.tileId, now)) {
+          // The first tap already turned it round: put it back, then play it.
+          lastTap.current = null;
+          setFlipped((f) => flipTile(f, drag.tileId));
+          playByTap(drag.tileId);
+        } else {
+          // A single tap turns the tile round, straight away.
+          lastTap.current = { tileId: drag.tileId, at: now };
+          setChoosing(null);
+          setFlipped((f) => flipTile(f, drag.tileId));
+          setTurning((t) => ({ id: drag.tileId, n: (t?.n ?? 0) + 1 }));
+        }
       }
       setDrag(null);
       start.current = null;
@@ -343,6 +413,12 @@ export default function PlayableHand({
 
   return (
     <>
+      {showHint && (
+        <div className="play-hint" role="note">
+          <span>Tap a tile to flip it. Double-tap to play it.</span>
+          <button onClick={dismissHint}>Got it</button>
+        </div>
+      )}
       <div ref={handRef} className={`hand ${disabled ? "sending" : ""}`}>
         {laidOut.map((id) => {
           const { a, b } = face(id);
@@ -356,9 +432,26 @@ export default function PlayableHand({
               vertical
               highlight={usable}
               dimmed={yourTurn && !playable.has(id)}
-              className={`${usable ? "grabbable" : ""} ${isActive ? "lifted" : ""} ${
+              className={`${usable ? "grabbable" : ""} ${isActive || choosing === id ? "lifted" : ""} ${
                 drag?.tileId === id && drag.moved ? "dragging" : ""
               }`}
+              tabIndex={0}
+              label={tileLabel(a, b, playable.has(id), yourTurn)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  playByTap(id);
+                } else if (e.key === " " || e.key.toLowerCase() === "f") {
+                  e.preventDefault();
+                  setFlipped((f) => flipTile(f, id));
+                  setTurning((t) => ({ id, n: (t?.n ?? 0) + 1 }));
+                } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+                  e.preventDefault();
+                  const el = e.currentTarget;
+                  const next = (e.key === "ArrowLeft" ? el.previousElementSibling : el.nextElementSibling) as HTMLElement | null;
+                  next?.focus();
+                }
+              }}
               onPointerDown={(e) => {
                 // Hold any tile — playable or not — to read it properly.
                 held.current = false;
@@ -394,6 +487,39 @@ export default function PlayableHand({
             </div>
           );
         })}
+
+      {/* A tile that fits both ends: the two ends to pick from. Real buttons,
+          so a tap, a click or the keyboard all work. */}
+      {choosing && (
+        <div
+          ref={endButtons}
+          role="group"
+          aria-label={`Play ${face(choosing).a}|${face(choosing).b} on which end?`}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setChoosing(null);
+          }}
+        >
+          {(["left", "right"] as End[]).map((end) => {
+            const anchor = ends[end];
+            if (!anchor || !movesFor(choosing).some((m) => m.end === end)) return null;
+            return (
+              <button
+                key={end}
+                className="drop-target end-choice"
+                style={{ left: anchor.x, top: anchor.y }}
+                aria-label={`${end === "left" ? "Left" : "Right"} end`}
+                onClick={() => {
+                  const id = choosing;
+                  setChoosing(null);
+                  onPlay(id, end);
+                }}
+              >
+                <span className="drop-label">{end}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {zoomed && (
         <ZoomedTile

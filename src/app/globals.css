@@ -3657,3 +3657,160 @@ body {
     bottom: 16px;
   }
 }
+
+/* ================================================================
+   Playing without a drag, and the keyboard (redesign phase 2)
+   ================================================================ */
+
+/* The two ends offered when a tile fits both: real buttons you tap. */
+.drop-target.end-choice {
+  pointer-events: auto;
+  cursor: pointer;
+  color: var(--ink);
+  border-style: solid;
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 30%, transparent);
+  animation:
+    target-in 0.16s ease-out,
+    end-pulse 1.2s ease-in-out 0.16s 2;
+  font: inherit;
+}
+
+.drop-target.end-choice:hover,
+.drop-target.end-choice:focus-visible {
+  background: color-mix(in srgb, var(--gold) 50%, transparent);
+  outline: 3px solid var(--gold);
+  outline-offset: 3px;
+}
+
+.drop-target.end-choice .drop-label {
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+@keyframes end-pulse {
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+/* A tile waiting for you to pick its end stays lifted. */
+.hand .tile.lifted {
+  opacity: 1;
+}
+
+.hand .tile:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 3px;
+}
+
+/* Tiles you cannot play: darker, not see-through, so their pips stay
+   readable and they still look like tiles. */
+.hand .tile.dimmed {
+  opacity: 1;
+  filter: brightness(0.62) saturate(0.6);
+}
+
+/* The one-time hint sits just above your hand, over the table's edge,
+   so showing and dismissing it never resizes the table. */
+.hand-area {
+  position: relative;
+}
+
+.play-hint {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(100%, 360px);
+  z-index: 140;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px 10px 16px;
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--paper-ink);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--shade) 45%, transparent);
+  font-size: 14px;
+}
+
+.play-hint span {
+  flex: 1;
+}
+
+.play-hint button {
+  flex: none;
+  min-height: 44px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 10px;
+  background: var(--gold);
+  color: var(--gold-ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* How to play, folded into the menu. */
+.how-to {
+  text-align: left;
+  font-size: 0.92rem;
+}
+
+.how-to summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.how-to ul {
+  padding-left: 1.2em;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--paper-ink-2);
+}
+
+/* ---- touch targets of at least 44px ---- */
+
+button,
+a,
+summary,
+.check {
+  touch-action: manipulation;
+}
+
+.seat-take {
+  min-height: 44px;
+  padding: 0 16px;
+  font-size: 14px;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 15px;
+  opacity: 1;
+  color: var(--ink-soft);
+}
+
+.check {
+  min-height: 44px;
+}
+
+.check input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  accent-color: var(--gold);
+}
+
+.home-note a {
+  display: inline-block;
+  padding: 10px 0;
+}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useModal } from "./useModal";
 import { reviewRound } from "@/engine/review";
 import type { MoveReview, Verdict } from "@/engine/review";
 import type { MoveRecord, Seat } from "@/engine/types";
@@ -31,6 +32,9 @@ export default function ReviewPanel({
   const review = useMemo(() => reviewRound(history, seat), [history, seat]);
   const [lens, setLens] = useState<"principles" | "engine" | "round">("principles");
   const [disputing, setDisputing] = useState<FeedbackContext | null>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  // While the dispute form is up, Escape belongs to it.
+  useModal(boxRef, () => { if (!disputing) onClose(); });
 
   /** The position this verdict was about, so it can be replayed exactly. */
   const positionFor = (moveNumber: number) => {
@@ -40,7 +44,14 @@ export default function ReviewPanel({
 
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="review" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="review"
+        ref={boxRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Your play this round"
+        onClick={(e) => e.stopPropagation()}
+      >
         <header className="review-head">
           <div>
             <h2>Your play this round</h2>

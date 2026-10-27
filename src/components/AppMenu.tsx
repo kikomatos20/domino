@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useModal } from "./useModal";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -58,6 +59,12 @@ export default function AppMenu({
   useEffect(() => setMounted(true), []);
   /** The table look, read once the page is in the browser. */
   const [look, setLook] = useState<Look>("a");
+  const menuRef = useRef<HTMLElement>(null);
+  const badgesRef = useRef<HTMLDivElement>(null);
+  const leaveRef = useRef<HTMLDivElement>(null);
+  useModal(menuRef, () => setOpen(false), open);
+  useModal(badgesRef, () => setBadges(null), Boolean(badges || loadingBadges));
+  useModal(leaveRef, () => setLeavingTo(null), Boolean(leavingTo));
   useEffect(() => setLook(readLook()), []);
 
   /**
@@ -127,7 +134,14 @@ export default function AppMenu({
 
       {open && portal(
         <div className="overlay" onClick={() => setOpen(false)}>
-          <nav className="dialog app-menu" onClick={(e) => e.stopPropagation()}>
+          <nav
+            className="dialog app-menu"
+            ref={menuRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu"
+            onClick={(e) => e.stopPropagation()}
+          >
             <header className="app-menu-head">
               <h2>{account ? account.username : "Domino"}</h2>
               <button
@@ -234,6 +248,16 @@ export default function AppMenu({
               </div>
             </section>
 
+            <details className="how-to">
+              <summary>How to play</summary>
+              <ul>
+                <li>Tap a tile to flip it. Double-tap it (or press Enter) to play it.</li>
+                <li>If it fits both ends, both light up: tap the one you want.</li>
+                <li>You can still drag a tile onto an end, or within your hand to sort it.</li>
+                <li>Hold any tile to read it up close.</li>
+              </ul>
+            </details>
+
             {/* Only true if there is actually a table to go back to. */}
             {inGame && (
               <p className="app-menu-note">
@@ -254,6 +278,10 @@ export default function AppMenu({
         >
           <div
             className="dialog badges-dialog"
+            ref={badgesRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Achievements"
             onClick={(e) => e.stopPropagation()}
           >
             <header className="app-menu-head">
@@ -282,7 +310,14 @@ export default function AppMenu({
 
       {leavingTo && portal(
         <div className="overlay" onClick={() => setLeavingTo(null)}>
-          <div className="dialog" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="dialog"
+            ref={leaveRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Leave the table?"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2>Leave the table?</h2>
             <p className="home-sub">
               The game carries on without you — the computer will cover your seat.
